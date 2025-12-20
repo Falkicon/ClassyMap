@@ -7,7 +7,7 @@ A minimalist square minimap addon for World of Warcraft. Transforms the default 
 [![GitHub](https://img.shields.io/badge/GitHub-Falkicon%2FClassyMap-181717?logo=github)](https://github.com/Falkicon/ClassyMap)
 [![Sponsor](https://img.shields.io/badge/Sponsor-pink?logo=githubsponsors)](https://github.com/sponsors/Falkicon)
 
-> **Minimal Footprint**: Single-purpose addon focused on doing one thing well – making your minimap look great.
+> **Minimal Footprint**: Single-purpose addon focused on doing one thing well, making your minimap look great.
 
 ## Features
 
