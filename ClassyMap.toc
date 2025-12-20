@@ -1,0 +1,11 @@
+## Interface: 120001
+## Title: ClassyMap
+## Notes: A minimalist square minimap with a simple border and button drawer.
+## Author: Falkicon
+## Version: 1.0.0
+## SavedVariables: ClassyMapDB
+## IconTexture: Interface\Icons\INV_Misc_Map02
+
+embeds.xml
+Core.lua
+Settings.lua

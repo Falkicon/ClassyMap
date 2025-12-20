@@ -1,0 +1,19 @@
+package-as: ClassyMap
+
+enable-nolib-creation: no
+
+ignore:
+  - .git
+  - .github
+  - .gitignore
+  - .luacheckrc
+  - .markdownlint.json
+  - .vscode
+  - AGENTS.md
+  - CHANGELOG.md
+  - LICENSE
+  - README.md
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
