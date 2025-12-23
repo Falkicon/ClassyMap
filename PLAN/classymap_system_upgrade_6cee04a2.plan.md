@@ -123,6 +123,7 @@ format_addon("ClassyMap", true)  → No changes needed
 validate_tocs()                  → PASS
 extract_locale_strings()         → All strings covered
 run_tests("ClassyMap")           → Tests pass (requires lua.exe)
+release_addon("ClassyMap")       → v1.1.0 Released
 ```
 
 ---
