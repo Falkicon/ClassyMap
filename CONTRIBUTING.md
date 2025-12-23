@@ -84,3 +84,4 @@ Before submitting:
 ## Questions?
 
 Open an issue or check the existing documentation. Thanks for helping make ClassyMap better!
+

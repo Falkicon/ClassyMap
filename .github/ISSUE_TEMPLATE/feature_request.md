@@ -32,3 +32,4 @@ ClassyMap is a lightweight square minimap addon. Does this feature fit that scop
 ## Additional Context
 
 Mockups, examples from other addons, or any other relevant information.
+

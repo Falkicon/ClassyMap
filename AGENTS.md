@@ -2,7 +2,7 @@
 
 Technical reference for AI agents modifying this addon.
 
-For shared patterns, documentation requirements, and library management, see **[ADDON_DEV/AGENTS.md](../../ADDON_DEV/AGENTS.md)**.
+For shared patterns, library references, and development guides, see **[ADDON_DEV/AGENTS.md](../ADDON_DEV/AGENTS.md)**.
 
 ---
 
@@ -32,7 +32,34 @@ A simple addon that transforms the default circular minimap into a clean square 
 |------|---------|
 | `Core.lua` | Minimap modification, border creation, shape override |
 | `Settings.lua` | AceConfig settings UI |
+| `Locales/enUS.lua` | Base localization strings |
+| `Tests/core_spec.lua` | Unit tests for combat queue and layout |
 | `ClassyMap.toc` | Metadata |
+
+---
+
+## Tooling & Workflow
+
+### Formatting
+This addon follows the workspace StyLua standard.
+```powershell
+# Format the addon
+powershell -File "_dev_\ADDON_DEV\Tools\Formatter\format.ps1" -Addon "ClassyMap"
+```
+
+### Localization
+All user-facing strings must be wrapped in `L["KEY"]`.
+```powershell
+# Extract strings
+powershell -File "_dev_\ADDON_DEV\Tools\LocalizationTool\localize.ps1" -Addon "ClassyMap"
+```
+
+### Testing
+Unit tests are located in `Tests/` and use the Busted framework.
+```powershell
+# Run tests
+powershell -File "_dev_\ADDON_DEV\Tools\TestRunner\run_tests.ps1" -Addon "ClassyMap"
+```
 
 ---
 
