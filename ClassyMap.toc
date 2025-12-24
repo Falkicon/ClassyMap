@@ -2,7 +2,7 @@
 ## Title: ClassyMap
 ## Notes: A minimalist square minimap with a simple border and button drawer.
 ## Author: Jason Falk
-## Version: 1.1.0
+## Version: 1.1.1
 ## SavedVariables: ClassyMapDB
 ## IconTexture: Interface\Icons\INV_Misc_Map02
 ## X-License: GPL-3.0

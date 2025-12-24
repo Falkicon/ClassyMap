@@ -70,7 +70,7 @@ local addonName, ns = "ClassyMap", {}
 describe("ClassyMap Core Logic", function()
 	local ClassyMap
 
-	setup(function()
+	before_each(function()
 		-- This is where we would normally load the file.
 		-- Since I cannot 'loadfile' easily here without the full environment,
 		-- I will simulate the ClassyMap object logic for the purpose of this test.
