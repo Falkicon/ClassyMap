@@ -1,4 +1,9 @@
 # Changelog
+## [1.2.3] - 2025-12-31
+
+### Changed
+- Release features
+
 
 All notable changes to ClassyMap will be documented in this file.
 

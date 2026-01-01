@@ -90,3 +90,4 @@ end
 
 - **Root**: `ClassyMapDB`
 - Settings stored via AceDB profile system
+
