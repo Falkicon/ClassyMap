@@ -1,0 +1,28 @@
+{
+  "$schema": "https://mechanic.dev/schemas/libs.json",
+  "description": "ClassyMap addon libraries - Ace3 with FenCore for pure logic",
+  "mode": "include",
+  "libraries": {
+    "LibStub": "latest",
+    "FenCore": "local",
+    "CallbackHandler-1.0": "latest",
+    "AceAddon-3.0": "latest",
+    "AceConfig-3.0": "latest",
+    "AceConsole-3.0": "latest",
+    "AceDB-3.0": "latest",
+    "AceDBOptions-3.0": "latest",
+    "AceEvent-3.0": "latest",
+    "AceGUI-3.0": "latest",
+    "AceGUI-3.0-SharedMediaWidgets": "latest",
+    "AceHook-3.0": "latest",
+    "AceLocale-3.0": "latest",
+    "LibSharedMedia-3.0": "latest",
+    "LibDataBroker-1.1": "latest",
+    "LibDBIcon-1.0": "latest"
+  },
+  "notes": {
+    "LibStub": "Required for all Ace3 libraries",
+    "FenCore": "Pure logic domains (Math.Clamp for validation)",
+    "LibDBIcon-1.0": "Minimap button support"
+  }
+}

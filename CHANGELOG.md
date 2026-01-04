@@ -1,4 +1,9 @@
 # Changelog
+## [1.3.0] - 2026-01-04
+
+### Changed
+- Maintenance release with stability updates
+
 ## [1.2.3] - 2025-12-31
 
 ### Changed

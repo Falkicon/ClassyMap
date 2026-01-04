@@ -36,6 +36,9 @@ local defaults = {
 		hideTracking = false,
 		hideInstance = false,
 		hideZoneText = false,
+
+		-- Debug (Mechanic integration)
+		debugMode = false,
 	},
 }
 
@@ -295,6 +298,8 @@ function ClassyMap:FixLayout()
 end
 
 function ClassyMap:ApplyMinimapChanges()
+	local totalStart = debugprofilestop()
+
 	if not self.db.profile.enabled then
 		self:ResetMinimap()
 		return
@@ -311,10 +316,18 @@ function ClassyMap:ApplyMinimapChanges()
 	end
 
 	-- 3. Border
+	local borderStart = debugprofilestop()
 	self:CreateBorder()
+	if ClassyMapMechanic then
+		ClassyMapMechanic:RecordPerfMetric("CreateBorder", (debugprofilestop() - borderStart) / 1000)
+	end
 
 	-- 4. Hide Clutter
+	local clutterStart = debugprofilestop()
 	self:HideMinimapClutter()
+	if ClassyMapMechanic then
+		ClassyMapMechanic:RecordPerfMetric("HideClutter", (debugprofilestop() - clutterStart) / 1000)
+	end
 
 	-- 5. Blobs (disable ring effects that don't work well with square minimap)
 	Minimap:SetArchBlobRingScalar(0)
@@ -339,19 +352,23 @@ function ClassyMap:ApplyMinimapChanges()
 	end
 
 	-- 8. Fonts
+	local fontStart = debugprofilestop()
 	self:ApplyFontStyles()
+	if ClassyMapMechanic then
+		ClassyMapMechanic:RecordPerfMetric("ApplyFontStyles", (debugprofilestop() - fontStart) / 1000)
+	end
 
 	-- 9. Layout
+	local layoutStart = debugprofilestop()
 	self:FixLayout()
+	if ClassyMapMechanic then
+		ClassyMapMechanic:RecordPerfMetric("FixLayout", (debugprofilestop() - layoutStart) / 1000)
+	end
 
 	if not self.hookedLayout then
 		hooksecurefunc(MinimapCluster, "SetWidth", function()
 			if not self.resizing then
 				self.resizing = true
-				-- We only want to run this if enabled (could check self.db)
-				-- Also, running FixLayout repeatedly is costly.
-				-- Blizzard often animates SetWidth.
-				-- Basic throttle or check:
 				if self.db.profile.enabled then
 					self:FixLayout()
 				end
@@ -359,6 +376,11 @@ function ClassyMap:ApplyMinimapChanges()
 			end
 		end)
 		self.hookedLayout = true
+	end
+
+	-- Record total time
+	if ClassyMapMechanic then
+		ClassyMapMechanic:RecordPerfMetric("ApplyMinimapChanges", (debugprofilestop() - totalStart) / 1000)
 	end
 end
 
