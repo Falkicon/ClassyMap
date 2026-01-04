@@ -60,13 +60,24 @@ Open settings via `/cm` or `Esc` → `Options` → `AddOns` → `ClassyMap`.
 
 - World of Warcraft Retail 11.0+ or Midnight Beta
 
+## Localization
+
+ClassyMap supports 11 languages:
+- English (enUS) - baseline
+- German (deDE), French (frFR), Spanish (esES/esMX), Italian (itIT)
+- Portuguese (ptBR), Russian (ruRU), Korean (koKR)
+- Chinese Simplified (zhCN), Chinese Traditional (zhTW)
+
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `ClassyMap.toc` | Addon manifest |
-| `Core.lua` | Minimap modification, border creation, shape override |
+| `ClassyMap.lua` | Main addon entry, minimap modification, UI |
+| `Core/init.lua` | Pure logic layer (validation, combat queue) |
 | `Settings.lua` | AceConfig settings UI |
+| `Mechanic.lua` | Mechanic integration for debugging |
+| `Locales/` | 11 locale files |
 
 ## Technical Notes
 

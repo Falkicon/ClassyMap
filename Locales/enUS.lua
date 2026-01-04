@@ -14,8 +14,6 @@ L["Click to open expansion summary"] = "Click to open expansion summary"
 -- Settings.lua
 L["A minimalist square minimap with a simple border and button drawer.\n"] =
 	"A minimalist square minimap with a simple border and button drawer.\n"
-L["Enable ClassyMap"] = "Enable ClassyMap"
-L["Toggle the square minimap on/off."] = "Toggle the square minimap on/off."
 L["Border"] = "Border"
 L["Border Size"] = "Border Size"
 L["Thickness of the minimap border. Set to 0 to hide."] = "Thickness of the minimap border. Set to 0 to hide."

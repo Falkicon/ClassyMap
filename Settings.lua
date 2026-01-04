@@ -22,20 +22,6 @@ local function GetOptions()
 				fontSize = "medium",
 				order = 0,
 			},
-			enabled = {
-				type = "toggle",
-				name = L["Enable ClassyMap"],
-				desc = L["Toggle the square minimap on/off."],
-				width = "full",
-				order = 1,
-				get = function()
-					return ClassyMap.db.profile.enabled
-				end,
-				set = function(_, val)
-					ClassyMap.db.profile.enabled = val
-					ClassyMap:ApplyMinimapChanges()
-				end,
-			},
 
 			-- Border Settings
 			borderHeader = {

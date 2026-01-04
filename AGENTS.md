@@ -30,12 +30,12 @@ A simple addon that transforms the default circular minimap into a clean square 
 
 | File | Purpose |
 |------|---------|
-| `Core.lua` | Minimap modification, border creation, shape override |
+| `ClassyMap.lua` | Main addon entry, minimap modification, UI |
 | `Core/init.lua` | Pure Lua core layer (validation, combat queue) - sandbox-compatible |
+| `Core/core_spec.lua` | Busted unit tests for Core layer |
 | `Settings.lua` | AceConfig settings UI |
 | `Mechanic.lua` | Mechanic integration for debugging/testing |
-| `Locales/enUS.lua` | Base localization strings |
-| `Tests/core_spec.lua` | Unit tests for Core layer |
+| `Locales/` | 11 locale files (enUS baseline + 10 translations) |
 | `ClassyMap.toc` | Metadata |
 
 ---
@@ -44,23 +44,28 @@ A simple addon that transforms the default circular minimap into a clean square 
 
 This addon uses **Mechanic** for development tooling:
 
-| Task | Command |
-|------|---------|
-| Linting | `mech call addon.lint -i '{"addon": "ClassyMap"}'` |
-| Formatting | `mech call addon.format -i '{"addon": "ClassyMap"}'` |
-| Testing | `mech call sandbox.test -i '{"addon": "ClassyMap"}'` |
-| Lib Check | `mech call libs.check -i '{"addon": "ClassyMap"}'` |
-| Validation | `mech call addon.validate -i '{"addon": "ClassyMap"}'` |
+| Task | MCP Tool |
+|------|----------|
+| Linting | `addon.lint` with addon="ClassyMap" |
+| Formatting | `addon.format` with addon="ClassyMap" |
+| Testing | `sandbox.test` with addon="ClassyMap" |
+| Lib Check | `libs.check` with addon="ClassyMap" |
+| Validation | `addon.validate` with addon="ClassyMap" |
+| Deprecations | `addon.deprecations` with addon="ClassyMap" |
+| Locale Check | `locale.validate` with addon="ClassyMap" |
 
 **Development Loop:**
-```bash
-# After any code change:
-mech call reload.trigger                    # Focus WoW + trigger /reload
-mech call addon.output -i '{"agent_mode": true}'  # Get errors/logs
-```
+1. Make code changes
+2. Ask user to `/reload` in WoW
+3. Wait for confirmation
+4. Call `addon.output` with agent_mode=true to get errors/logs
 
 ### Localization
 All user-facing strings must be wrapped in `L["KEY"]`.
+
+**Coverage:** 34 keys across 11 locales (enUS baseline + 10 translations).
+
+Validate with: `locale.validate` with addon="ClassyMap"
 
 ---
 

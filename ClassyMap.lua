@@ -1,9 +1,11 @@
 local addonName, ns = ...
 local ClassyMap = LibStub("AceAddon-3.0"):NewAddon("ClassyMap", "AceConsole-3.0", "AceEvent-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("ClassyMap")
-local GUI = LibStub("AceConfigDialog-3.0")
 local LSM = LibStub("LibSharedMedia-3.0")
 ns.ClassyMap = ClassyMap
+
+-- Core layer for pure logic (combat queue, validation)
+local Core = ClassyMapCore
 
 local hiddenFrame = CreateFrame("Frame")
 hiddenFrame:Hide()
@@ -13,7 +15,6 @@ hiddenFrame:Hide()
 -- =============================================================================
 local defaults = {
 	profile = {
-		enabled = true,
 		borderColor = { r = 0, g = 0, b = 0, a = 1 },
 		borderSize = 1,
 
@@ -23,7 +24,7 @@ local defaults = {
 		hideClock = false,
 
 		-- Fonts
-		font = "Fira Sans Condensed Black",
+		font = "Friz Quadrata TT",
 		zoneFontSize = 11,
 		overrideZoneColor = false,
 		zoneTextColor = { r = 1, g = 1, b = 1, a = 1 },
@@ -43,16 +44,15 @@ local defaults = {
 }
 
 -- =============================================================================
--- Combat Logic
+-- Combat Logic (delegates to Core layer)
 -- =============================================================================
-local combatQueue = {}
 
 function ClassyMap:RunSafe(func, ...)
 	if InCombatLockdown() then
-		-- Serialize args cleanly if possible, or just closure it
-		-- For simplicity in Lua, wrapping in a closure is easiest but arguments need care
-		-- We will store the function and args table
-		table.insert(combatQueue, { func = func, args = { ... } })
+		-- Queue action for when combat ends
+		Core:QueueAction(function(...)
+			func(self, ...)
+		end, { ... })
 		self:RegisterEvent("PLAYER_REGEN_ENABLED")
 	else
 		func(self, ...)
@@ -60,13 +60,19 @@ function ClassyMap:RunSafe(func, ...)
 end
 
 function ClassyMap:ProcessCombatQueue()
-	for _, item in ipairs(combatQueue) do
-		local success, err = pcall(item.func, self, unpack(item.args))
-		if not success then
-			geterrorhandler()(err)
+	local count = Core:GetQueueLength()
+	if count > 0 then
+		for i = 1, count do
+			local item = Core.combatQueue[i]
+			if item then
+				local success, err = pcall(item.func, unpack(item.args))
+				if not success then
+					geterrorhandler()(err)
+				end
+			end
 		end
+		Core:ClearQueue()
 	end
-	table.wipe(combatQueue)
 	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
 end
 
@@ -134,14 +140,7 @@ function ClassyMap:OnEnable()
 end
 
 function ClassyMap:SlashHandler(msg)
-	local cmd = msg:trim():lower()
-	if cmd == "toggle" then
-		self.db.profile.enabled = not self.db.profile.enabled
-		self:RunSafe(self.ApplyMinimapChanges)
-		self:Print(self.db.profile.enabled and L["Enabled"] or L["Disabled"])
-	else
-		ns.Settings:OpenOptions()
-	end
+	ns.Settings:OpenOptions()
 end
 
 -- =============================================================================
@@ -300,11 +299,6 @@ end
 function ClassyMap:ApplyMinimapChanges()
 	local totalStart = debugprofilestop()
 
-	if not self.db.profile.enabled then
-		self:ResetMinimap()
-		return
-	end
-
 	-- 1. Apply Square Mask
 	Minimap:SetMaskTexture("Interface\\BUTTONS\\WHITE8X8")
 
@@ -369,9 +363,7 @@ function ClassyMap:ApplyMinimapChanges()
 		hooksecurefunc(MinimapCluster, "SetWidth", function()
 			if not self.resizing then
 				self.resizing = true
-				if self.db.profile.enabled then
-					self:FixLayout()
-				end
+				self:FixLayout()
 				self.resizing = false
 			end
 		end)
@@ -424,8 +416,9 @@ function ClassyMap:UpdateBorderStyle()
 		return
 	end
 
-	local size = self.db.profile.borderSize
-	local c = self.db.profile.borderColor
+	-- Use Core layer for validation
+	local size = Core:ValidateBorderSize(self.db.profile.borderSize)
+	local c = Core:ValidateColor(self.db.profile.borderColor)
 
 	-- If size is 0, hide all
 	if size <= 0 then
@@ -531,10 +524,6 @@ function ClassyMap:HideMinimapClutter()
 end
 
 function ClassyMap:CreateExpansionReplacement()
-	if not self.db.profile.enabled then
-		return
-	end
-
 	if self.expansionReplacementBtn then
 		-- Update Icon
 		local iconPath = self.db.profile.expansionIcon
@@ -605,81 +594,31 @@ function ClassyMap:ApplyFontStyles()
 	local fontPath = LSM:Fetch("font", db.font) or "Fonts\\FRIZQT__.TTF"
 
 	if MinimapZoneText then
-		MinimapZoneText:SetFont(fontPath, db.zoneFontSize, "OUTLINE")
+		-- Use Core layer for validation
+		local zoneFontSize = Core:ValidateFontSize(db.zoneFontSize)
+		MinimapZoneText:SetFont(fontPath, zoneFontSize, "OUTLINE")
 
 		-- Only override color if enabled. Otherwise let Blizzard handle it (Sanctuary/Contested colors).
 		if db.overrideZoneColor then
-			local c = db.zoneTextColor
+			local c = Core:ValidateColor(db.zoneTextColor)
 			MinimapZoneText:SetTextColor(c.r, c.g, c.b, c.a)
-		else
-			-- If we are not overriding, we let Blizzard's native code handle it.
 		end
 	end
 
 	if TimeManagerClockButton then
 		local region = TimeManagerClockButton:GetRegions() -- Usually the first region is the text
 		if region then
-			region:SetFont(fontPath, db.clockFontSize, "OUTLINE")
-			local c = db.clockTextColor
+			-- Use Core layer for validation
+			local clockFontSize = Core:ValidateFontSize(db.clockFontSize)
+			local c = Core:ValidateColor(db.clockTextColor)
+			region:SetFont(fontPath, clockFontSize, "OUTLINE")
 			region:SetTextColor(c.r, c.g, c.b, c.a)
 		end
 	end
 end
 
-function ClassyMap:ResetMinimap()
-	Minimap:SetMaskTexture("Textures\\MinimapMask")
-
-	if self.borders then
-		for _, tex in pairs(self.borders) do
-			tex:Hide()
-		end
-	end
-	if self.borderFrame then
-		self.borderFrame:Hide()
-	end
-
-	-- Restore Zoom
-	if self.zoomParentIn then
-		Minimap.ZoomIn:SetParent(self.zoomParentIn)
-	end
-	if self.zoomParentOut then
-		Minimap.ZoomOut:SetParent(self.zoomParentOut)
-	end
-
-	-- Restore Expansion
-	if ExpansionLandingPageMinimapButton then
-		ExpansionLandingPageMinimapButton:Show()
-		ExpansionLandingPageMinimapButton:SetAlpha(1)
-	end
-	if self.expansionReplacementBtn then
-		self.expansionReplacementBtn:Hide()
-	end
-
-	if MinimapCompassTexture then
-		MinimapCompassTexture:Show()
-		MinimapCompassTexture:SetAlpha(1)
-	end
-	if MinimapCluster.BorderTop then
-		MinimapCluster.BorderTop:SetAlpha(1)
-	end
-	if TimeManagerClockButton then
-		TimeManagerClockButton:Show()
-	end
-	if MinimapCluster.Tracking then
-		MinimapCluster.Tracking:Show()
-	end
-
-	Minimap:SetArchBlobRingScalar(1)
-	Minimap:SetQuestBlobRingScalar(1)
-	Minimap:SetTaskBlobRingScalar(1)
-
-	GetMinimapShape = function()
-		return "ROUND"
-	end
-end
-
 local function OnHybridMinimapLoaded()
-	if HybridMinimap and ClassyMap.db.profile.enabled then
+	if HybridMinimap then
 		HybridMinimap.MapCanvas:SetUseMaskTexture(false)
 		HybridMinimap.CircleMask:SetTexture("Interface\\BUTTONS\\WHITE8X8")
 		HybridMinimap.MapCanvas:SetUseMaskTexture(true)

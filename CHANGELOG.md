@@ -1,20 +1,30 @@
 # Changelog
-## [1.3.0] - 2026-01-04
-
-### Changed
-- Maintenance release with stability updates
-
-## [1.2.3] - 2025-12-31
-
-### Changed
-- Release features
-
 
 All notable changes to ClassyMap will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] - 2026-01-04
 
+### Added
+- **Full Localization**: Complete translations for 10 languages
+  - German (deDE), French (frFR), Spanish (esES/esMX), Italian (itIT)
+  - Portuguese (ptBR), Russian (ruRU), Korean (koKR)
+  - Chinese Simplified (zhCN), Chinese Traditional (zhTW)
+
+### Changed
+- **Core Layer Refactor**: Renamed Core.lua to ClassyMap.lua; now delegates to Core/init.lua for combat queue and validation
+- **FenCore Integration**: Settings validation uses FenCore.Math.Clamp with graceful fallbacks
+- Removed duplicated combat queue logic
+- Default font changed from custom to standard WoW font (Friz Quadrata TT)
+
+### Removed
+- Enable/disable toggle (to disable ClassyMap, disable the addon)
+
+## [1.2.3] - 2025-12-31
+
+### Changed
+- Release features
 
 ## [1.1.1] - 2025-12-24
 
