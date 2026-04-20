@@ -1,8 +1,8 @@
-## Interface: 120005
+## Interface: 120005, 120001
 ## Title: ClassyMap
 ## Notes: A minimalist square minimap with a simple border and button drawer.
 ## Author: Jason Falk
-## Version: 1.4.0
+## Version: 1.4.1
 ## SavedVariables: ClassyMapDB
 ## IconTexture: Interface\Icons\INV_Misc_Map02
 ## X-License: GPL-3.0
