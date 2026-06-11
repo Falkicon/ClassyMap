@@ -4,6 +4,12 @@ All notable changes to ClassyMap will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] - 2026-04-30
+
+### Changed
+- **Expansion Button**: The minimap expansion button now opens the Adventure Guide (shift-J) — Renowns, Traveler's Log, Dungeons, Raids — instead of the most recently unlocked covenant/garrison landing page (which was stuck on Shadowlands/Venthyr).
+- **Expansion Button Icon**: Replaced the static Shadowlands-themed TGA with a dynamic atlas selected from Blizzard's `ExpansionLandingPage` overlay info, falling back through Midnight → War Within → Dragonflight landing-button atlases. The icon now reflects the current expansion automatically.
+
 ## [1.3.0] - 2026-01-04
 
 ### Added
