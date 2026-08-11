@@ -1,4 +1,4 @@
-## Interface: 120005, 120001
+## Interface: 120100
 ## Title: ClassyMap
 ## Notes: A minimalist square minimap with a simple border and button drawer.
 ## Author: Jason Falk
