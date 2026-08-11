@@ -523,14 +523,51 @@ function ClassyMap:HideMinimapClutter()
 	end
 end
 
+-- Newest-first list of expansion landing-button atlases. Used as a fallback
+-- chain when an expansion (e.g. Midnight in beta) hasn't shipped its own art.
+local EXPANSION_ICON_ATLASES = {
+	"midnight-landingbutton-up",
+	"warwithin-landingbutton-up",
+	"dragonflight-landingbutton-up",
+}
+
+function ClassyMap:GetExpansionIconAtlas()
+	-- Prefer whatever the live ExpansionLandingPage system reports — matches
+	-- Blizzard's own button when that subsystem is loaded.
+	if ExpansionLandingPage and ExpansionLandingPage.GetOverlayMinimapDisplayInfo then
+		local ok, info = pcall(ExpansionLandingPage.GetOverlayMinimapDisplayInfo, ExpansionLandingPage)
+		if ok and info and info.normalAtlas and C_Texture.GetAtlasInfo(info.normalAtlas) then
+			return info.normalAtlas
+		end
+	end
+
+	for _, atlas in ipairs(EXPANSION_ICON_ATLASES) do
+		if C_Texture.GetAtlasInfo(atlas) then
+			return atlas
+		end
+	end
+end
+
+function ClassyMap:ApplyExpansionIcon(icon)
+	if not icon then
+		return
+	end
+	local atlas = self:GetExpansionIconAtlas()
+	if atlas then
+		icon:SetAtlas(atlas, false)
+		return
+	end
+	local iconPath = self.db.profile.expansionIcon
+	if not iconPath or iconPath == "" then
+		iconPath = "Interface\\Icons\\Inv_misc_book_17"
+	end
+	icon:SetTexture(iconPath)
+	icon:SetTexCoord(0, 1, 0, 1)
+end
+
 function ClassyMap:CreateExpansionReplacement()
 	if self.expansionReplacementBtn then
-		-- Update Icon
-		local iconPath = self.db.profile.expansionIcon
-		if not iconPath or iconPath == "" then
-			iconPath = "Interface\\Icons\\Inv_misc_book_17"
-		end
-		self.expansionReplacementBtn.icon:SetTexture(iconPath)
+		self:ApplyExpansionIcon(self.expansionReplacementBtn.icon)
 		return
 	end
 
@@ -543,44 +580,25 @@ function ClassyMap:CreateExpansionReplacement()
 	btn.icon = btn:CreateTexture(nil, "ARTWORK")
 	btn.icon:SetAllPoints()
 
-	local iconPath = self.db.profile.expansionIcon
-	if not iconPath or iconPath == "" then
-		iconPath = "Interface\\Icons\\Inv_misc_book_17"
-	end
-	btn.icon:SetTexture(iconPath)
-
-	btn.icon:SetTexCoord(0, 1, 0, 1) -- No crop
+	self:ApplyExpansionIcon(btn.icon)
 
 	btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
 	btn:SetScript("OnClick", function()
-		-- Prioritize Blizzard's native button logic as it handles mode detection
-		-- (Garrison vs Expansion) and alert clearing.
-		if ExpansionLandingPageMinimapButton then
-			-- We use a raw pcall here because Blizzard's UI code is crashing internally
-			-- on the Midnight beta. The functionality (opening the panel) still works
-			-- despite the internal crash.
-			pcall(ExpansionLandingPageMinimapButton.Click, ExpansionLandingPageMinimapButton)
-		elseif ToggleExpansionLandingPage then
-			pcall(ToggleExpansionLandingPage)
+		-- Open the Adventure Guide (shift-J): renown, traveler's log, dungeons,
+		-- raids — the panel that actually summarizes current-expansion progress.
+		-- The native ExpansionLandingPageMinimapButton opens the most recently
+		-- unlocked covenant/garrison instead, which is rarely what we want.
+		if ToggleEncounterJournal then
+			pcall(ToggleEncounterJournal)
 		end
 	end)
 
 	btn:SetScript("OnEnter", function(self)
-		local native = ExpansionLandingPageMinimapButton
-		if native and native.title then
-			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-			GameTooltip:SetText(native.title, 1, 1, 1)
-			if native.description then
-				GameTooltip:AddLine(native.description, nil, nil, nil, true)
-			end
-			GameTooltip:Show()
-		else
-			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-			GameTooltip:AddLine(L["Expansion Summary"])
-			GameTooltip:AddLine(L["Click to open expansion summary"], 0.8, 0.8, 0.8)
-			GameTooltip:Show()
-		end
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		GameTooltip:AddLine(L["Expansion Summary"])
+		GameTooltip:AddLine(L["Click to open expansion summary"], 0.8, 0.8, 0.8)
+		GameTooltip:Show()
 	end)
 	btn:SetScript("OnLeave", function()
 		GameTooltip:Hide()
