@@ -1,4 +1,4 @@
-local addonName, ns = ...
+local _, ns = ...
 local ClassyMap = LibStub("AceAddon-3.0"):NewAddon("ClassyMap", "AceConsole-3.0", "AceEvent-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("ClassyMap")
 local LSM = LibStub("LibSharedMedia-3.0")
@@ -9,6 +9,216 @@ local Core = ClassyMapCore
 
 local hiddenFrame = CreateFrame("Frame")
 hiddenFrame:Hide()
+
+-- Capture observable Blizzard state before writing it. Once another owner changes
+-- a property, leave that property alone until the next enable cycle.
+local unpackValues = unpack
+local function Pack(...)
+	return { n = select("#", ...), ... }
+end
+local function Equal(a, b)
+	if a.n ~= b.n then
+		return false
+	end
+	for i = 1, a.n do
+		if type(a[i]) == "table" and a[i].n then
+			if type(b[i]) ~= "table" or not Equal(a[i], b[i]) then
+				return false
+			end
+		elseif a[i] ~= b[i] then
+			return false
+		end
+	end
+	return true
+end
+local getters = {
+	SetUseMaskTexture = "GetUseMaskTexture",
+	SetParent = "GetParent",
+	SetWidth = "GetWidth",
+	SetHeight = "GetHeight",
+	SetFrameStrata = "GetFrameStrata",
+	SetScale = "GetScale",
+	SetAlpha = "GetAlpha",
+	SetFont = "GetFont",
+	SetTextColor = "GetTextColor",
+	SetTexture = "GetTexture",
+	SetJustifyH = "GetJustifyH",
+	SetJustifyV = "GetJustifyV",
+	SetWordWrap = "CanWordWrap",
+	SetClampedToScreen = "IsClampedToScreen",
+	SetClampRectInsets = "GetClampRectInsets",
+}
+local function ReadProperty(frame, key)
+	if key == "points" then
+		if not frame.GetNumPoints or not frame.GetPoint then
+			return nil
+		end
+		local points = { n = frame:GetNumPoints() }
+		for i = 1, points.n do
+			points[i] = Pack(frame:GetPoint(i))
+		end
+		return points
+	elseif key == "shown" then
+		return frame.IsShown and Pack(frame:IsShown())
+	end
+	local getter = getters[key]
+	return getter and frame[getter] and Pack(frame[getter](frame))
+end
+function ClassyMap:OwnSet(frame, method, ...)
+	if not frame then
+		return
+	end
+	local key = (method == "ClearAllPoints" or method == "SetPoint" or method == "SetAllPoints") and "points"
+		or (method == "Show" or method == "Hide") and "shown"
+		or method
+	self.ownedFrames = self.ownedFrames or {}
+	self.frameOriginals = self.frameOriginals or {}
+	if not self.frameOriginals[frame] then
+		-- Capture geometry before parenting/anchoring changes can alter derived
+		-- dimensions; only properties actually written are restored later.
+		self.frameOriginals[frame] = {
+			points = ReadProperty(frame, "points"),
+			SetParent = ReadProperty(frame, "SetParent"),
+			SetWidth = ReadProperty(frame, "SetWidth"),
+			SetHeight = ReadProperty(frame, "SetHeight"),
+		}
+	end
+	local properties = self.ownedFrames[frame] or {}
+	self.ownedFrames[frame] = properties
+	local current = ReadProperty(frame, key)
+	local state = properties[key]
+	if state then
+		if state.released then
+			return
+		end
+		if current and not Equal(current, state.last) then
+			state.released = true
+			return
+		end
+	elseif current then
+		local geometry = key == "points" or key == "SetParent" or key == "SetWidth" or key == "SetHeight"
+		state = { original = geometry and self.frameOriginals[frame][key] or current, last = current }
+		properties[key] = state
+	end
+	if state and HybridMinimap and (frame == HybridMinimap.CircleMask or frame == HybridMinimap.MapCanvas) then
+		-- Hybrid and base masks must continue to agree with square shape reporting
+		-- until reload; base mask state cannot be restored from an API getter.
+		state.keepOnDisable = key == "SetTexture" or key == "SetUseMaskTexture"
+	end
+	-- Remember which other properties still belong to us before this mutation.
+	local retained = {}
+	for otherKey, otherState in pairs(properties) do
+		local value = ReadProperty(frame, otherKey)
+		if not otherState.released and otherState.last and value and Equal(value, otherState.last) then
+			retained[otherKey] = true
+		end
+	end
+	frame[method](frame, ...)
+	if state then
+		state.last = ReadProperty(frame, key)
+	end
+	for otherKey in pairs(retained) do
+		properties[otherKey].last = ReadProperty(frame, otherKey)
+	end
+end
+local restoreOrder = {
+	"SetParent",
+	"SetScale",
+	"SetWidth",
+	"SetHeight",
+	"points",
+	"SetFrameStrata",
+	"SetClampedToScreen",
+	"SetClampRectInsets",
+	"SetFont",
+	"SetJustifyH",
+	"SetJustifyV",
+	"SetWordWrap",
+	"SetTextColor",
+	"SetTexture",
+	"SetUseMaskTexture",
+	"SetAlpha",
+	"shown",
+}
+function ClassyMap:RestoreOwnedFrames()
+	-- Decide ownership before restoring anything: a parent/anchor restoration can
+	-- itself change derived dimensions on a different frame.
+	local eligible = {}
+	for frame, properties in pairs(self.ownedFrames or {}) do
+		eligible[frame] = {}
+		for key, state in pairs(properties) do
+			local current = ReadProperty(frame, key)
+			eligible[frame][key] = not state.released
+				and not state.keepOnDisable
+				and current
+				and Equal(current, state.last)
+		end
+	end
+	for _, key in ipairs(restoreOrder) do
+		for frame, properties in pairs(self.ownedFrames or {}) do
+			local state = properties[key]
+			if state and eligible[frame][key] then
+				local values = state.original
+				if key == "points" then
+					frame:ClearAllPoints()
+					for i = 1, values.n do
+						frame:SetPoint(unpackValues(values[i], 1, values[i].n))
+					end
+				elseif key == "shown" then
+					if values[1] then
+						frame:Show()
+					else
+						frame:Hide()
+					end
+				else
+					frame[key](frame, unpackValues(values, 1, values.n))
+				end
+			end
+		end
+	end
+	self.ownedFrames = nil
+	self.frameOriginals = nil
+	self.zoomParentIn = nil
+	self.zoomParentOut = nil
+	self.zoneColorOverridden = nil
+	-- Mask and blob APIs expose no matching getters. Keep square shape reporting
+	-- consistent with the remaining square mask; a reload fully removes these.
+	for _, texture in pairs(self.borders or {}) do
+		texture:Hide()
+	end
+	if self.expansionReplacementBtn then
+		self.expansionReplacementBtn:Hide()
+	end
+	self.restorePending = nil
+end
+
+-- Native color/visibility updates are expected while we own their policy.
+-- Refresh the comparison baseline only from the corresponding Blizzard hook.
+function ClassyMap:AcceptNativeUpdate(frame, key)
+	local properties = self.ownedFrames and self.ownedFrames[frame]
+	local state = properties and properties[key]
+	if state and not state.released then
+		local value = ReadProperty(frame, key)
+		if value then
+			state.last = value
+			state.original = value
+		end
+		return true
+	end
+end
+
+function ClassyMap:OwnsProperty(frame, key)
+	local properties = self.ownedFrames and self.ownedFrames[frame]
+	local state = properties and properties[key]
+	local current = state and ReadProperty(frame, key)
+	if state and not state.released and current and Equal(current, state.last) then
+		return true
+	end
+	if state then
+		state.released = true
+	end
+	return false
+end
 
 -- =============================================================================
 -- Default Configuration
@@ -48,32 +258,44 @@ local defaults = {
 -- =============================================================================
 
 function ClassyMap:RunSafe(func, ...)
+	if self.runtimeEnabled == false then
+		return
+	end
+	local generation = self.refreshGeneration
 	if InCombatLockdown() then
 		-- Queue action for when combat ends
 		Core:QueueAction(function(...)
-			func(self, ...)
-		end, { ... })
-		self:RegisterEvent("PLAYER_REGEN_ENABLED")
+			if generation == self.refreshGeneration and self.runtimeEnabled ~= false then
+				func(self, ...)
+			end
+		end, { n = select("#", ...), ... })
+		self:RegisterEvent("PLAYER_REGEN_ENABLED", "ProcessCombatQueue")
 	else
 		func(self, ...)
 	end
 end
 
 function ClassyMap:ProcessCombatQueue()
-	local count = Core:GetQueueLength()
-	if count > 0 then
-		for i = 1, count do
-			local item = Core.combatQueue[i]
-			if item then
-				local success, err = pcall(item.func, unpack(item.args))
-				if not success then
-					geterrorhandler()(err)
-				end
-			end
-		end
-		Core:ClearQueue()
+	if InCombatLockdown() then
+		return
 	end
-	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	if self.restorePending then
+		self:RestoreOwnedFrames()
+	end
+	Core:ProcessQueue(geterrorhandler())
+	if self.pendingRefresh then
+		self:RequestRefresh(next(self.pendingRefresh))
+	end
+	if Core:GetQueueLength() == 0 then
+		self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	else
+		local generation = self.refreshGeneration
+		C_Timer.After(0, function()
+			if generation == self.refreshGeneration then
+				self:ProcessCombatQueue()
+			end
+		end)
+	end
 end
 
 -- =============================================================================
@@ -96,39 +318,33 @@ function ClassyMap:OnInitialize()
 		})
 	end
 
-	self:RegisterEvent("PLAYER_REGEN_ENABLED", "ProcessCombatQueue")
-
-	-- Defensive Patch for Blizzard Midnight Beta Bug:
-	-- Blizzard's LandingPageRenownButtonMixin:UpdateButtonTextures crashes if covenantData is nil.
-	-- We hook it to ensure it only runs if data is valid.
-	self:RegisterEvent("ADDON_LOADED", function(_, addon)
-		if addon == "Blizzard_LandingSoulbinds" then
-			if LandingPageRenownButtonMixin and LandingPageRenownButtonMixin.UpdateButtonTextures then
-				local old = LandingPageRenownButtonMixin.UpdateButtonTextures
-				LandingPageRenownButtonMixin.UpdateButtonTextures = function(self)
-					local id = C_Covenants.GetActiveCovenantID()
-					if id and id ~= 0 then
-						local data = C_Covenants.GetCovenantData(id)
-						if data and data.textureKit then
-							return old(self)
-						end
-					end
-					-- If we get here, data is missing or invalid. Hide the button to prevent crash.
-					self:Hide()
-				end
-			end
-		end
-	end)
-
 	self:Print(L["Loaded. Type /classymap or /cm for options."])
 end
 
 function ClassyMap:OnEnable()
+	self.runtimeEnabled = true
+	self.refreshGeneration = (self.refreshGeneration or 0) + 1
+	self.refreshScheduled = nil
+	self.restorePending = nil
+	if self.restoreFrame then
+		self.restoreFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	end
+	self.worldReady = IsLoggedIn()
+	self:RegisterEvent("ADDON_LOADED", "OnBlizzardAddonLoaded")
+	if Minimap_Update and not self.hookedZoneColor then
+		hooksecurefunc("Minimap_Update", function()
+			if self.runtimeEnabled and self:AcceptNativeUpdate(MinimapZoneText, "SetTextColor") then
+				self:RequestRefresh("fonts")
+			end
+		end)
+		self.hookedZoneColor = true
+	end
 	if IsLoggedIn() then
-		self:RunSafe(self.ApplyMinimapChanges)
+		self:RequestRefresh("all")
 	else
 		self:RegisterEvent("PLAYER_ENTERING_WORLD", function()
-			self:RunSafe(self.ApplyMinimapChanges)
+			self.worldReady = true
+			self:RequestRefresh("all")
 			self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 		end)
 	end
@@ -139,7 +355,123 @@ function ClassyMap:OnEnable()
 	self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ApplyFontStyles")
 end
 
-function ClassyMap:SlashHandler(msg)
+function ClassyMap:OnDisable()
+	self.runtimeEnabled = false
+	self.refreshGeneration = (self.refreshGeneration or 0) + 1
+	self.refreshScheduled = nil
+	self.pendingRefresh = nil
+	Core:ClearQueue()
+	self:UnregisterAllEvents()
+	if InCombatLockdown() then
+		self.restorePending = true
+		-- AceEvent unregisters addon events after OnDisable returns. A private frame
+		-- owns this one-shot restoration event so it survives that library cleanup.
+		if not self.restoreFrame then
+			self.restoreFrame = CreateFrame("Frame")
+			self.restoreFrame:SetScript("OnEvent", function(frame)
+				if not InCombatLockdown() then
+					frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+					if self.restorePending and not self.runtimeEnabled then
+						self:RestoreOwnedFrames()
+					end
+				end
+			end)
+		end
+		self.restoreFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+	else
+		self:RestoreOwnedFrames()
+	end
+end
+
+function ClassyMap:RequestRefresh(scope)
+	if not self.runtimeEnabled then
+		return
+	end
+	scope = scope or "all"
+	if scope == "full" then
+		scope = "all"
+	end
+	assert(
+		scope == "all" or scope == "border" or scope == "fonts" or scope == "visibility" or scope == "layout",
+		"Unknown refresh scope"
+	)
+	self.pendingRefresh = self.pendingRefresh or {}
+	self.pendingRefresh[scope] = true
+	if self.refreshScheduled or not self.worldReady then
+		return
+	end
+	if InCombatLockdown() then
+		self:RegisterEvent("PLAYER_REGEN_ENABLED", "ProcessCombatQueue")
+		return
+	end
+	self.refreshScheduled = true
+	local generation = self.refreshGeneration
+	C_Timer.After(0, function()
+		if generation ~= self.refreshGeneration or not self.runtimeEnabled then
+			return
+		end
+		self.refreshScheduled = nil
+		if InCombatLockdown() then
+			self:RegisterEvent("PLAYER_REGEN_ENABLED", "ProcessCombatQueue")
+			return
+		end
+		local pending = self.pendingRefresh
+		self.pendingRefresh = nil
+		if not pending then
+			return
+		end
+		self.executingRefresh = true
+		local started = debugprofilestop()
+		local ok, err = pcall(function()
+			if pending.all then
+				self:ApplyMinimapChanges()
+			else
+				if pending.border then
+					self:MeasureRefresh("CreateBorder", self.CreateBorder)
+				end
+				if pending.visibility then
+					self:MeasureRefresh("HideClutter", self.HideMinimapClutter)
+				end
+				if pending.fonts then
+					self:MeasureRefresh("ApplyFontStyles", self.ApplyFontStyles)
+				end
+				if pending.layout or pending.visibility then
+					self:MeasureRefresh("FixLayout", self.FixLayout)
+				end
+			end
+		end)
+		self.executingRefresh = nil
+		if ClassyMapMechanic then
+			ClassyMapMechanic:RecordPerfMetric("Refresh", debugprofilestop() - started)
+		end
+		if not ok then
+			geterrorhandler()(err)
+		end
+	end)
+end
+
+function ClassyMap:MeasureRefresh(name, action)
+	local started = debugprofilestop()
+	local ok, err = pcall(action, self)
+	if ClassyMapMechanic then
+		ClassyMapMechanic:RecordPerfMetric(name, debugprofilestop() - started)
+	end
+	if not ok then
+		geterrorhandler()(err)
+	end
+end
+
+function ClassyMap:OnBlizzardAddonLoaded(_, addon)
+	if
+		addon == "Blizzard_TimeManager"
+		or addon == "Blizzard_HybridMinimap"
+		or addon == "Blizzard_ExpansionLandingPage"
+	then
+		self:ApplyMinimapChanges()
+	end
+end
+
+function ClassyMap:SlashHandler()
 	ns.Settings:OpenOptions()
 end
 
@@ -150,12 +482,12 @@ function ClassyMap:SatStyles(f)
 	if not f then
 		return
 	end
-	f:SetParent(Minimap)
-	f:SetFrameStrata("DIALOG")
-	f:Show()
+	self:OwnSet(f, "SetParent", Minimap)
+	self:OwnSet(f, "SetFrameStrata", "DIALOG")
+	self:OwnSet(f, "Show")
 end
 
-function ClassyMap:FixLayout()
+local function ApplyLayout(self)
 	local db = self.db.profile
 	local MARGIN = 4
 	local STACK_GAP = 2
@@ -163,35 +495,34 @@ function ClassyMap:FixLayout()
 
 	-- Cluster & Map
 	if MinimapCluster then
-		MinimapCluster:SetWidth(Minimap:GetWidth())
-		MinimapCluster:SetHeight(Minimap:GetHeight())
-		MinimapCluster:SetClampedToScreen(false)
+		self:OwnSet(MinimapCluster, "SetWidth", Minimap:GetWidth())
+		self:OwnSet(MinimapCluster, "SetHeight", Minimap:GetHeight())
 	end
 	if Minimap then
-		Minimap:ClearAllPoints()
-		Minimap:SetPoint("CENTER", MinimapCluster, "CENTER", 0, 0)
+		self:OwnSet(Minimap, "ClearAllPoints")
+		self:OwnSet(Minimap, "SetPoint", "CENTER", MinimapCluster, "CENTER", 0, 0)
 	end
 
 	-- Zone Text (Top Center)
 	if MinimapCluster.ZoneTextButton then
 		if not db.hideZoneText then
 			self:SatStyles(MinimapCluster.ZoneTextButton)
-			MinimapCluster.ZoneTextButton:ClearAllPoints()
+			self:OwnSet(MinimapCluster.ZoneTextButton, "ClearAllPoints")
 			-- Header Row Alignment (User Tweak: Down 2px from +2 -> 0)
-			MinimapCluster.ZoneTextButton:SetPoint("TOP", Minimap, "TOP", 0, 0)
-			MinimapCluster.ZoneTextButton:SetHeight(ICON_SIZE) -- Match Icon Height (24)
-			MinimapCluster.ZoneTextButton:SetAlpha(1)
+			self:OwnSet(MinimapCluster.ZoneTextButton, "SetPoint", "TOP", Minimap, "TOP", 0, 0)
+			self:OwnSet(MinimapCluster.ZoneTextButton, "SetHeight", ICON_SIZE) -- Match Icon Height (24)
+			self:OwnSet(MinimapCluster.ZoneTextButton, "SetAlpha", 1)
 
 			-- Centering Text
 			if MinimapZoneText then
-				MinimapZoneText:ClearAllPoints()
-				MinimapZoneText:SetAllPoints(MinimapCluster.ZoneTextButton)
-				MinimapZoneText:SetJustifyH("CENTER")
-				MinimapZoneText:SetJustifyV("MIDDLE")
-				MinimapZoneText:SetWordWrap(false)
+				self:OwnSet(MinimapZoneText, "ClearAllPoints")
+				self:OwnSet(MinimapZoneText, "SetAllPoints", MinimapCluster.ZoneTextButton)
+				self:OwnSet(MinimapZoneText, "SetJustifyH", "CENTER")
+				self:OwnSet(MinimapZoneText, "SetJustifyV", "MIDDLE")
+				self:OwnSet(MinimapZoneText, "SetWordWrap", false)
 			end
 		else
-			MinimapCluster.ZoneTextButton:Hide()
+			self:OwnSet(MinimapCluster.ZoneTextButton, "Hide")
 		end
 	end
 
@@ -199,14 +530,14 @@ function ClassyMap:FixLayout()
 	if TimeManagerClockButton then
 		if not db.hideClock then
 			self:SatStyles(TimeManagerClockButton)
-			TimeManagerClockButton:ClearAllPoints()
-			if MinimapCluster.ZoneTextButton then
-				TimeManagerClockButton:SetPoint("TOP", MinimapCluster.ZoneTextButton, "BOTTOM", 0, 0)
+			self:OwnSet(TimeManagerClockButton, "ClearAllPoints")
+			if MinimapCluster.ZoneTextButton and not db.hideZoneText then
+				self:OwnSet(TimeManagerClockButton, "SetPoint", "TOP", MinimapCluster.ZoneTextButton, "BOTTOM", 0, 0)
 			else
-				TimeManagerClockButton:SetPoint("TOP", Minimap, "TOP", 0, -MARGIN)
+				self:OwnSet(TimeManagerClockButton, "SetPoint", "TOP", Minimap, "TOP", 0, -MARGIN)
 			end
 		else
-			TimeManagerClockButton:Hide()
+			self:OwnSet(TimeManagerClockButton, "Hide")
 		end
 	end
 
@@ -215,10 +546,10 @@ function ClassyMap:FixLayout()
 	if MinimapCluster.Tracking then
 		if not db.hideTracking then
 			self:SatStyles(MinimapCluster.Tracking)
-			MinimapCluster.Tracking:ClearAllPoints()
-			MinimapCluster.Tracking:SetPoint("TOPLEFT", Minimap, "TOPLEFT", MARGIN, -MARGIN)
+			self:OwnSet(MinimapCluster.Tracking, "ClearAllPoints")
+			self:OwnSet(MinimapCluster.Tracking, "SetPoint", "TOPLEFT", Minimap, "TOPLEFT", MARGIN, -MARGIN)
 		else
-			MinimapCluster.Tracking:Hide()
+			self:OwnSet(MinimapCluster.Tracking, "Hide")
 		end
 	end
 
@@ -229,12 +560,12 @@ function ClassyMap:FixLayout()
 	if GameTimeFrame then
 		if not db.hideCalendar then
 			self:SatStyles(GameTimeFrame)
-			GameTimeFrame:ClearAllPoints()
-			GameTimeFrame:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", -MARGIN, -MARGIN)
-			GameTimeFrame:SetScale(1.0)
+			self:OwnSet(GameTimeFrame, "ClearAllPoints")
+			self:OwnSet(GameTimeFrame, "SetPoint", "TOPRIGHT", Minimap, "TOPRIGHT", -MARGIN, -MARGIN)
+			self:OwnSet(GameTimeFrame, "SetScale", 1.0)
 			lastFrame = GameTimeFrame
 		else
-			GameTimeFrame:Hide()
+			self:OwnSet(GameTimeFrame, "Hide")
 		end
 	end
 
@@ -242,19 +573,16 @@ function ClassyMap:FixLayout()
 	if AddonCompartmentFrame then
 		if not db.hideAddonBtn then
 			self:SatStyles(AddonCompartmentFrame)
-			AddonCompartmentFrame:ClearAllPoints()
+			self:OwnSet(AddonCompartmentFrame, "ClearAllPoints")
 			if lastFrame then
 				-- Center align with manual tweak (User requested revert to previous -> -2)
-				AddonCompartmentFrame:SetPoint("TOP", lastFrame, "BOTTOM", -2, -STACK_GAP)
+				self:OwnSet(AddonCompartmentFrame, "SetPoint", "TOP", lastFrame, "BOTTOM", -2, -STACK_GAP)
 			else
-				AddonCompartmentFrame:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", -MARGIN, -MARGIN)
+				self:OwnSet(AddonCompartmentFrame, "SetPoint", "TOPRIGHT", Minimap, "TOPRIGHT", -MARGIN, -MARGIN)
 			end
-			AddonCompartmentFrame:SetScale(1.0)
-			if not lastFrame then
-				lastFrame = AddonCompartmentFrame
-			end
+			self:OwnSet(AddonCompartmentFrame, "SetScale", 1.0)
 		else
-			AddonCompartmentFrame:Hide()
+			self:OwnSet(AddonCompartmentFrame, "Hide")
 		end
 	end
 
@@ -263,7 +591,7 @@ function ClassyMap:FixLayout()
 	if diffFrame then
 		if not db.hideInstance then
 			self:SatStyles(diffFrame)
-			diffFrame:ClearAllPoints()
+			self:OwnSet(diffFrame, "ClearAllPoints")
 			local topFrame = nil
 			if GameTimeFrame and GameTimeFrame:IsShown() then
 				topFrame = GameTimeFrame
@@ -272,13 +600,13 @@ function ClassyMap:FixLayout()
 			end
 
 			if topFrame then
-				diffFrame:SetPoint("RIGHT", topFrame, "LEFT", -STACK_GAP, 0)
+				self:OwnSet(diffFrame, "SetPoint", "RIGHT", topFrame, "LEFT", -STACK_GAP, 0)
 			else
-				diffFrame:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", -MARGIN, -MARGIN)
+				self:OwnSet(diffFrame, "SetPoint", "TOPRIGHT", Minimap, "TOPRIGHT", -MARGIN, -MARGIN)
 			end
-			diffFrame:SetScale(1.0)
+			self:OwnSet(diffFrame, "SetScale", 1.0)
 		else
-			diffFrame:Hide()
+			self:OwnSet(diffFrame, "Hide")
 		end
 	end
 
@@ -296,83 +624,79 @@ function ClassyMap:FixLayout()
 	end
 end
 
+function ClassyMap:RequestLayout()
+	if not self.resizing then
+		self:RequestRefresh("layout")
+	end
+end
+
+function ClassyMap:FixLayout()
+	if not self.executingRefresh then
+		self:RequestRefresh("layout")
+		return
+	end
+	if InCombatLockdown() then
+		self:RequestLayout()
+		return
+	end
+	if self.resizing then
+		return
+	end
+	self.resizing = true
+	local ok, err = pcall(ApplyLayout, self)
+	self.resizing = nil
+	if not ok then
+		geterrorhandler()(err)
+	end
+end
+
 function ClassyMap:ApplyMinimapChanges()
-	local totalStart = debugprofilestop()
-
-	-- 1. Apply Square Mask
-	Minimap:SetMaskTexture("Interface\\BUTTONS\\WHITE8X8")
-
-	-- 2. Hybrid Minimap
-	if HybridMinimap then
-		HybridMinimap.MapCanvas:SetUseMaskTexture(false)
-		HybridMinimap.CircleMask:SetTexture("Interface\\BUTTONS\\WHITE8X8")
-		HybridMinimap.MapCanvas:SetUseMaskTexture(true)
+	if not self.executingRefresh then
+		self:RequestRefresh("all")
+		return
 	end
-
-	-- 3. Border
-	local borderStart = debugprofilestop()
-	self:CreateBorder()
-	if ClassyMapMechanic then
-		ClassyMapMechanic:RecordPerfMetric("CreateBorder", (debugprofilestop() - borderStart) / 1000)
-	end
-
-	-- 4. Hide Clutter
-	local clutterStart = debugprofilestop()
-	self:HideMinimapClutter()
-	if ClassyMapMechanic then
-		ClassyMapMechanic:RecordPerfMetric("HideClutter", (debugprofilestop() - clutterStart) / 1000)
-	end
-
-	-- 5. Blobs (disable ring effects that don't work well with square minimap)
-	Minimap:SetArchBlobRingScalar(0)
-	Minimap:SetArchBlobRingAlpha(0)
-	Minimap:SetQuestBlobRingScalar(0)
-	Minimap:SetQuestBlobRingAlpha(0)
-	Minimap:SetTaskBlobRingScalar(0)
-	Minimap:SetTaskBlobRingAlpha(0)
-
-	-- 6. Shape
-	GetMinimapShape = function()
-		return "SQUARE"
-	end
-
-	-- 7. Clamping
-	if MinimapCluster then
-		MinimapCluster:SetClampedToScreen(true)
-		MinimapCluster:SetClampRectInsets(0, -60, 0, -60)
-	end
-	if Minimap then
-		Minimap:SetClampedToScreen(false)
-	end
-
-	-- 8. Fonts
-	local fontStart = debugprofilestop()
-	self:ApplyFontStyles()
-	if ClassyMapMechanic then
-		ClassyMapMechanic:RecordPerfMetric("ApplyFontStyles", (debugprofilestop() - fontStart) / 1000)
-	end
-
-	-- 9. Layout
-	local layoutStart = debugprofilestop()
-	self:FixLayout()
-	if ClassyMapMechanic then
-		ClassyMapMechanic:RecordPerfMetric("FixLayout", (debugprofilestop() - layoutStart) / 1000)
-	end
+	self:MeasureRefresh("Setup", function()
+		-- Relinquish mask changes together with shape reporting if another addon takes over.
+		if not self.shapeOverride or GetMinimapShape == self.shapeOverride then
+			-- Mask/blob scalar APIs have no observable original state; reload restores them.
+			Minimap:SetMaskTexture("Interface\\BUTTONS\\WHITE8X8")
+			if HybridMinimap then
+				self:OwnSet(HybridMinimap.MapCanvas, "SetUseMaskTexture", false)
+				self:OwnSet(HybridMinimap.CircleMask, "SetTexture", "Interface\\BUTTONS\\WHITE8X8")
+				self:OwnSet(HybridMinimap.MapCanvas, "SetUseMaskTexture", true)
+			end
+			Minimap:SetArchBlobRingScalar(0)
+			Minimap:SetArchBlobRingAlpha(0)
+			Minimap:SetQuestBlobRingScalar(0)
+			Minimap:SetQuestBlobRingAlpha(0)
+			Minimap:SetTaskBlobRingScalar(0)
+			Minimap:SetTaskBlobRingAlpha(0)
+			if not self.shapeOverride then
+				self.shapeOverride = function()
+					return "SQUARE"
+				end
+				GetMinimapShape = self.shapeOverride
+			end
+		end
+		if MinimapCluster then
+			self:OwnSet(MinimapCluster, "SetClampedToScreen", true)
+			self:OwnSet(MinimapCluster, "SetClampRectInsets", 0, -60, 0, -60)
+		end
+		self:OwnSet(Minimap, "SetClampedToScreen", false)
+	end)
+	self:MeasureRefresh("CreateBorder", self.CreateBorder)
+	self:MeasureRefresh("HideClutter", self.HideMinimapClutter)
+	self:MeasureRefresh("ApplyFontStyles", self.ApplyFontStyles)
+	self:MeasureRefresh("FixLayout", self.FixLayout)
 
 	if not self.hookedLayout then
 		hooksecurefunc(MinimapCluster, "SetWidth", function()
-			if not self.resizing then
-				self.resizing = true
-				self:FixLayout()
-				self.resizing = false
-			end
+			self:RequestLayout()
+		end)
+		hooksecurefunc(MinimapCluster, "SetHeight", function()
+			self:RequestLayout()
 		end)
 		self.hookedLayout = true
-	end
-
-	-- Record total time
-	if ClassyMapMechanic then
-		ClassyMapMechanic:RecordPerfMetric("ApplyMinimapChanges", (debugprofilestop() - totalStart) / 1000)
 	end
 end
 
@@ -382,10 +706,7 @@ function ClassyMap:CreateBorder()
 		return
 	end
 
-	-- "The Background Container" Strategy failed via Frame.
-	-- New Strategy: 4 Textures DIRECTLY on the Minimap object.
-	-- Layer: BACKGROUND, SubLevel: -5 (Lowest possible).
-	-- This guarantees they are "painted" onto the map canvas before anything else.
+	-- Textures on the map keep the border below child frames and buttons.
 
 	self.borders = {}
 	local function CreateLine()
@@ -461,8 +782,8 @@ function ClassyMap:HideMinimapClutter()
 
 	-- Force Hide Compass
 	if MinimapCompassTexture then
-		MinimapCompassTexture:Hide()
-		MinimapCompassTexture:SetAlpha(0)
+		self:OwnSet(MinimapCompassTexture, "Hide")
+		self:OwnSet(MinimapCompassTexture, "SetAlpha", 0)
 	end
 
 	-- Zoom Buttons
@@ -473,24 +794,26 @@ function ClassyMap:HideMinimapClutter()
 		if not self.zoomParentOut then
 			self.zoomParentOut = Minimap.ZoomOut:GetParent()
 		end
-		Minimap.ZoomIn:SetParent(hiddenFrame)
-		Minimap.ZoomOut:SetParent(hiddenFrame)
+		self:OwnSet(Minimap.ZoomIn, "SetParent", hiddenFrame)
+		self:OwnSet(Minimap.ZoomOut, "SetParent", hiddenFrame)
 	else
 		if self.zoomParentIn then
-			Minimap.ZoomIn:SetParent(self.zoomParentIn)
+			self:OwnSet(Minimap.ZoomIn, "SetParent", self.zoomParentIn)
 		end
 		if self.zoomParentOut then
-			Minimap.ZoomOut:SetParent(self.zoomParentOut)
+			self:OwnSet(Minimap.ZoomOut, "SetParent", self.zoomParentOut)
 		end
 	end
 
 	-- Expansion Landing Page (Always Replace Native)
 	if ExpansionLandingPageMinimapButton then
-		ExpansionLandingPageMinimapButton:Hide()
-		ExpansionLandingPageMinimapButton:SetAlpha(0)
+		self:OwnSet(ExpansionLandingPageMinimapButton, "Hide")
+		self:OwnSet(ExpansionLandingPageMinimapButton, "SetAlpha", 0)
 		if not self.expHooked then
-			hooksecurefunc(ExpansionLandingPageMinimapButton, "Show", function(self)
-				self:Hide()
+			hooksecurefunc(ExpansionLandingPageMinimapButton, "Show", function(button)
+				if self.runtimeEnabled and self:AcceptNativeUpdate(button, "shown") then
+					self:RequestRefresh("visibility")
+				end
 			end)
 			self.expHooked = true
 		end
@@ -510,16 +833,16 @@ function ClassyMap:HideMinimapClutter()
 	-- Tracking
 	if MinimapCluster.Tracking then
 		if db.hideTracking then
-			MinimapCluster.Tracking:Hide()
+			self:OwnSet(MinimapCluster.Tracking, "Hide")
 		else
-			MinimapCluster.Tracking:Show()
+			self:OwnSet(MinimapCluster.Tracking, "Show")
 		end
 	end
 
 	-- BorderTop
 	if MinimapCluster.BorderTop then
-		MinimapCluster.BorderTop:Hide()
-		MinimapCluster.BorderTop:SetAlpha(0)
+		self:OwnSet(MinimapCluster.BorderTop, "Hide")
+		self:OwnSet(MinimapCluster.BorderTop, "SetAlpha", 0)
 	end
 end
 
@@ -594,8 +917,8 @@ function ClassyMap:CreateExpansionReplacement()
 		end
 	end)
 
-	btn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	btn:SetScript("OnEnter", function(button)
+		GameTooltip:SetOwner(button, "ANCHOR_LEFT")
 		GameTooltip:AddLine(L["Expansion Summary"])
 		GameTooltip:AddLine(L["Click to open expansion summary"], 0.8, 0.8, 0.8)
 		GameTooltip:Show()
@@ -607,47 +930,48 @@ function ClassyMap:CreateExpansionReplacement()
 	self.expansionReplacementBtn = btn
 end
 
+function ClassyMap:ApplyZoneColor()
+	if not self.runtimeEnabled then
+		return
+	end
+	if MinimapZoneText and self.db.profile.overrideZoneColor then
+		local c = Core:ValidateColor(self.db.profile.zoneTextColor)
+		self:OwnSet(MinimapZoneText, "SetTextColor", c.r, c.g, c.b, c.a)
+		self.zoneColorOverridden = true
+	end
+end
+
 function ClassyMap:ApplyFontStyles()
+	if not self.executingRefresh then
+		self:RequestRefresh("fonts")
+		return
+	end
 	local db = self.db.profile
 	local fontPath = LSM:Fetch("font", db.font) or "Fonts\\FRIZQT__.TTF"
 
 	if MinimapZoneText then
 		-- Use Core layer for validation
 		local zoneFontSize = Core:ValidateFontSize(db.zoneFontSize)
-		MinimapZoneText:SetFont(fontPath, zoneFontSize, "OUTLINE")
+		self:OwnSet(MinimapZoneText, "SetFont", fontPath, zoneFontSize, "OUTLINE")
 
-		-- Only override color if enabled. Otherwise let Blizzard handle it (Sanctuary/Contested colors).
-		if db.overrideZoneColor then
-			local c = Core:ValidateColor(db.zoneTextColor)
-			MinimapZoneText:SetTextColor(c.r, c.g, c.b, c.a)
+		self:ApplyZoneColor()
+		if not db.overrideZoneColor and self.zoneColorOverridden and Minimap_Update then
+			self.zoneColorOverridden = nil
+			if self:OwnsProperty(MinimapZoneText, "SetTextColor") then
+				Minimap_Update()
+				self.ownedFrames[MinimapZoneText].SetTextColor = nil
+			end
 		end
 	end
 
 	if TimeManagerClockButton then
-		local region = TimeManagerClockButton:GetRegions() -- Usually the first region is the text
-		if region then
+		local region = TimeManagerClockTicker
+		if region and region.SetFont then
 			-- Use Core layer for validation
 			local clockFontSize = Core:ValidateFontSize(db.clockFontSize)
 			local c = Core:ValidateColor(db.clockTextColor)
-			region:SetFont(fontPath, clockFontSize, "OUTLINE")
-			region:SetTextColor(c.r, c.g, c.b, c.a)
+			self:OwnSet(region, "SetFont", fontPath, clockFontSize, "OUTLINE")
+			self:OwnSet(region, "SetTextColor", c.r, c.g, c.b, c.a)
 		end
 	end
 end
-
-local function OnHybridMinimapLoaded()
-	if HybridMinimap then
-		HybridMinimap.MapCanvas:SetUseMaskTexture(false)
-		HybridMinimap.CircleMask:SetTexture("Interface\\BUTTONS\\WHITE8X8")
-		HybridMinimap.MapCanvas:SetUseMaskTexture(true)
-	end
-end
-
-local loader = CreateFrame("Frame")
-loader:RegisterEvent("ADDON_LOADED")
-loader:SetScript("OnEvent", function(self, event, addon)
-	if addon == "Blizzard_HybridMinimap" then
-		OnHybridMinimapLoaded()
-		self:UnregisterEvent("ADDON_LOADED")
-	end
-end)

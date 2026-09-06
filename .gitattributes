@@ -1,0 +1,2 @@
+# Keep Lua formatter output stable across Windows development and Linux CI.
+*.lua text eol=lf

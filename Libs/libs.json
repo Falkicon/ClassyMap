@@ -14,15 +14,15 @@
     "AceEvent-3.0": "latest",
     "AceGUI-3.0": "latest",
     "AceGUI-3.0-SharedMediaWidgets": "latest",
-    "AceHook-3.0": "latest",
     "AceLocale-3.0": "latest",
-    "LibSharedMedia-3.0": "latest",
-    "LibDataBroker-1.1": "latest",
-    "LibDBIcon-1.0": "latest"
+    "LibSharedMedia-3.0": "latest"
   },
   "notes": {
     "LibStub": "Required for all Ace3 libraries",
     "FenCore": "Pure logic domains (Math.Clamp for validation)",
-    "LibDBIcon-1.0": "Minimap button support"
+    "AceConfig-3.0": "Settings registration and AceConfigDialog UI",
+    "AceDB-3.0": "SavedVariables and profile storage",
+    "AceDBOptions-3.0": "Profile management controls",
+    "LibSharedMedia-3.0": "Font selection in the settings panel"
   }
 }

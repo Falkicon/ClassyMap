@@ -16,8 +16,7 @@ L["A minimalist square minimap with a simple border and button drawer.\n"] =
 	"Eine minimalistische quadratische Minikarte mit einfachem Rahmen und Schaltflächenleiste.\n"
 L["Border"] = "Rahmen"
 L["Border Size"] = "Rahmengröße"
-L["Thickness of the minimap border. Set to 0 to hide."] =
-	"Dicke des Minikartenrahmens. Auf 0 setzen zum Ausblenden."
+L["Thickness of the minimap border. Set to 0 to hide."] = "Dicke des Minikartenrahmens. Auf 0 setzen zum Ausblenden."
 L["Border Color"] = "Rahmenfarbe"
 L["Color of the minimap border."] = "Farbe des Minikartenrahmens."
 L["Fonts"] = "Schriftarten"

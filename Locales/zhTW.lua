@@ -16,8 +16,7 @@ L["A minimalist square minimap with a simple border and button drawer.\n"] =
 	"一個極簡的方形小地圖，帶有簡潔邊框和按鈕抽屜。\n"
 L["Border"] = "邊框"
 L["Border Size"] = "邊框大小"
-L["Thickness of the minimap border. Set to 0 to hide."] =
-	"小地圖邊框的厚度。設定為 0 以隱藏。"
+L["Thickness of the minimap border. Set to 0 to hide."] = "小地圖邊框的厚度。設定為 0 以隱藏。"
 L["Border Color"] = "邊框顏色"
 L["Color of the minimap border."] = "小地圖邊框的顏色。"
 L["Fonts"] = "字型"

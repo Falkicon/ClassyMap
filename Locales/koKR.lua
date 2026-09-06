@@ -5,7 +5,8 @@ end
 
 -- Core.lua
 L["ClassyMap"] = "ClassyMap"
-L["Loaded. Type /classymap or /cm for options."] = "로드됨. 옵션을 보려면 /classymap 또는 /cm을 입력하세요."
+L["Loaded. Type /classymap or /cm for options."] =
+	"로드됨. 옵션을 보려면 /classymap 또는 /cm을 입력하세요."
 L["Enabled"] = "활성화됨"
 L["Disabled"] = "비활성화됨"
 L["Expansion Summary"] = "확장팩 요약"

@@ -3,8 +3,11 @@ local L = LibStub("AceLocale-3.0"):GetLocale("ClassyMap")
 local Settings = {}
 ns.Settings = Settings
 
+local Core = ClassyMapCore
 local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
+local AceDBOptions = LibStub("AceDBOptions-3.0")
 
 -- =============================================================================
 -- Options Table
@@ -12,7 +15,7 @@ local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local function GetOptions()
 	local ClassyMap = ns.ClassyMap
 
-	return {
+	local options = {
 		name = L["ClassyMap"],
 		type = "group",
 		args = {
@@ -38,11 +41,11 @@ local function GetOptions()
 				step = 1,
 				order = 11,
 				get = function()
-					return ClassyMap.db.profile.borderSize
+					return Core:ValidateBorderSize(ClassyMap.db.profile.borderSize)
 				end,
 				set = function(_, val)
-					ClassyMap.db.profile.borderSize = val
-					ClassyMap:UpdateBorderStyle()
+					ClassyMap.db.profile.borderSize = Core:ValidateBorderSize(val)
+					ClassyMap:RequestRefresh("border")
 				end,
 			},
 			borderColor = {
@@ -52,12 +55,12 @@ local function GetOptions()
 				hasAlpha = true,
 				order = 12,
 				get = function()
-					local c = ClassyMap.db.profile.borderColor
+					local c = Core:ValidateColor(ClassyMap.db.profile.borderColor)
 					return c.r, c.g, c.b, c.a
 				end,
 				set = function(_, r, g, b, a)
-					ClassyMap.db.profile.borderColor = { r = r, g = g, b = b, a = a }
-					ClassyMap:UpdateBorderStyle()
+					ClassyMap.db.profile.borderColor = Core:ValidateColor({ r = r, g = g, b = b, a = a })
+					ClassyMap:RequestRefresh("border")
 				end,
 			},
 
@@ -78,22 +81,22 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.font = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("fonts")
 				end,
 			},
 			zoneFontSize = {
 				type = "range",
 				name = L["Zone Text Size"],
 				min = 6,
-				max = 16,
+				max = 24,
 				step = 1,
 				order = 18,
 				get = function()
-					return ClassyMap.db.profile.zoneFontSize
+					return Core:ValidateFontSize(ClassyMap.db.profile.zoneFontSize)
 				end,
 				set = function(_, val)
-					ClassyMap.db.profile.zoneFontSize = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap.db.profile.zoneFontSize = Core:ValidateFontSize(val)
+					ClassyMap:RequestRefresh("fonts")
 				end,
 			},
 			overrideZoneColor = {
@@ -107,7 +110,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.overrideZoneColor = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("fonts")
 				end,
 			},
 			zoneTextColor = {
@@ -116,12 +119,12 @@ local function GetOptions()
 				hasAlpha = true,
 				order = 19,
 				get = function()
-					local c = ClassyMap.db.profile.zoneTextColor
+					local c = Core:ValidateColor(ClassyMap.db.profile.zoneTextColor)
 					return c.r, c.g, c.b, c.a
 				end,
 				set = function(_, r, g, b, a)
-					ClassyMap.db.profile.zoneTextColor = { r = r, g = g, b = b, a = a }
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap.db.profile.zoneTextColor = Core:ValidateColor({ r = r, g = g, b = b, a = a })
+					ClassyMap:RequestRefresh("fonts")
 				end,
 				disabled = function()
 					return not ClassyMap.db.profile.overrideZoneColor
@@ -131,15 +134,15 @@ local function GetOptions()
 				type = "range",
 				name = L["Clock Text Size"],
 				min = 6,
-				max = 16,
+				max = 24,
 				step = 1,
 				order = 20,
 				get = function()
-					return ClassyMap.db.profile.clockFontSize
+					return Core:ValidateFontSize(ClassyMap.db.profile.clockFontSize)
 				end,
 				set = function(_, val)
-					ClassyMap.db.profile.clockFontSize = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap.db.profile.clockFontSize = Core:ValidateFontSize(val)
+					ClassyMap:RequestRefresh("fonts")
 				end,
 			},
 			clockTextColor = {
@@ -148,16 +151,15 @@ local function GetOptions()
 				hasAlpha = true,
 				order = 21,
 				get = function()
-					local c = ClassyMap.db.profile.clockTextColor
+					local c = Core:ValidateColor(ClassyMap.db.profile.clockTextColor)
 					return c.r, c.g, c.b, c.a
 				end,
 				set = function(_, r, g, b, a)
-					ClassyMap.db.profile.clockTextColor = { r = r, g = g, b = b, a = a }
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap.db.profile.clockTextColor = Core:ValidateColor({ r = r, g = g, b = b, a = a })
+					ClassyMap:RequestRefresh("fonts")
 				end,
 			},
 
-			-- Hide Elements
 			-- Hide Elements
 			hideHeader = {
 				type = "header",
@@ -175,7 +177,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideTracking = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 
@@ -189,7 +191,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideZoneText = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 			hideClock = {
@@ -202,7 +204,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideClock = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 
@@ -217,7 +219,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideZoomButtons = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 			hideExpansionButton = {
@@ -230,7 +232,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideExpansionButton = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 			-- Custom Icon Input removed as per request (Hardcoded)
@@ -245,7 +247,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideCalendar = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 			hideAddonBtn = {
@@ -257,7 +259,7 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideAddonBtn = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 			hideInstance = {
@@ -269,25 +271,56 @@ local function GetOptions()
 				end,
 				set = function(_, val)
 					ClassyMap.db.profile.hideInstance = val
-					ClassyMap:ApplyMinimapChanges()
+					ClassyMap:RequestRefresh("visibility")
 				end,
 			},
 		},
 	}
+
+	options.args.profiles = AceDBOptions:GetOptionsTable(ClassyMap.db)
+	options.args.profiles.order = 100
+	return options
 end
 
 -- =============================================================================
 -- Registration
 -- =============================================================================
+function Settings:OnProfileUpdated()
+	local ClassyMap = ns.ClassyMap
+	ClassyMap:RequestRefresh("all")
+	AceConfigRegistry:NotifyChange("ClassyMap")
+end
+
+function Settings:RegisterProfileCallbacks()
+	if self.profileCallbacksRegistered then
+		return
+	end
+
+	local db = ns.ClassyMap.db
+	db.RegisterCallback(self, "OnProfileChanged", "OnProfileUpdated")
+	db.RegisterCallback(self, "OnProfileCopied", "OnProfileUpdated")
+	db.RegisterCallback(self, "OnProfileReset", "OnProfileUpdated")
+	self.profileCallbacksRegistered = true
+end
+
 function Settings:Initialize()
+	if self.optionsFrame then
+		return true
+	end
+	if not ns.ClassyMap or not ns.ClassyMap.db then
+		return false
+	end
+
 	AceConfig:RegisterOptionsTable("ClassyMap", GetOptions)
 	self.optionsFrame = AceConfigDialog:AddToBlizOptions("ClassyMap", "ClassyMap")
+	self:RegisterProfileCallbacks()
+	return true
 end
 
 function Settings:OpenOptions()
 	-- Ensure registered
-	if not self.optionsFrame then
-		self:Initialize()
+	if not self.optionsFrame and not self:Initialize() then
+		return
 	end
 
 	-- Open standalone dialog
@@ -297,9 +330,14 @@ end
 -- Auto-init on addon load
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
-loader:SetScript("OnEvent", function(self, event, addon)
+loader:SetScript("OnEvent", function(self, _, addon)
 	if addon == addonName then
-		Settings:Initialize()
 		self:UnregisterEvent("ADDON_LOADED")
+		if not Settings:Initialize() then
+			-- AceAddon normally initializes first; defer once if event ordering differs.
+			C_Timer.After(0, function()
+				Settings:Initialize()
+			end)
+		end
 	end
 end)

@@ -1,0 +1,68 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lua:
+    name: Lua 5.1, manifest, tests, lint, and format
+    runs-on: ubuntu-24.04
+    env:
+      LUACHECK_VERSION: "0.23.0"
+      STYLUA_VERSION: "2.3.1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install Lua tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes curl liblua5.1-0-dev lua5.1 luarocks unzip
+          luarocks --lua-version=5.1 --tree "$RUNNER_TEMP/luarocks" install luacheck "$LUACHECK_VERSION"
+          echo "$RUNNER_TEMP/luarocks/bin" >> "$GITHUB_PATH"
+          curl --fail --location --silent --show-error \
+            --output "$RUNNER_TEMP/stylua.zip" \
+            "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/stylua-linux-x86_64.zip"
+          unzip -q "$RUNNER_TEMP/stylua.zip" -d "$RUNNER_TEMP/stylua"
+          chmod +x "$RUNNER_TEMP/stylua/stylua"
+          echo "$RUNNER_TEMP/stylua" >> "$GITHUB_PATH"
+
+      - name: Verify tool versions
+        run: |
+          set -euo pipefail
+          lua5.1 -v
+          luacheck --version
+          stylua --version
+
+      - name: Run offline regression tests
+        run: |
+          set -euo pipefail
+          lua5.1 tests/run_core.lua
+          lua5.1 tests/run_core.lua --fencore
+          lua5.1 tests/runtime_regressions.lua
+          lua5.1 tests/settings_regressions.lua
+          lua5.1 tests/ace_integration.lua
+          lua5.1 tests/mechanic_regressions.lua
+
+      - name: Validate manifest, dependencies, and localization
+        run: python3 tests/check_repo.py --lua lua5.1
+
+      - name: Lint first-party Lua
+        run: luacheck . --config .luacheckrc
+
+      - name: Check first-party Lua formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          stylua --check --syntax Lua51 \
+            ClassyMap.lua Settings.lua Mechanic.lua Core/init.lua Locales/*.lua

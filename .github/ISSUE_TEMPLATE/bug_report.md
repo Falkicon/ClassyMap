@@ -26,9 +26,10 @@ What actually happened.
 
 ## Environment
 
-- **WoW Version**: (e.g., 11.0.5 Retail, Midnight Beta)
-- **Interface Version**: (from TOC)
+- **Addon Version**: (from ClassyMap.toc)
+- **WoW Version / Build / Client**: (actual game version and build, Retail or Beta)
 - **Other Addons**: (list any that might interact, or "none")
+- **Context**: (in combat, using Edit Mode, switching profiles, or after a reload)
 
 ## Lua Errors
 

@@ -32,8 +32,9 @@ describe("ClassyMap Core", function()
 				count = count + 1
 			end, {})
 
-			local processed = ClassyMapCore:ProcessQueue()
+			local processed, failed = ClassyMapCore:ProcessQueue()
 			assert.equals(2, processed)
+			assert.equals(0, failed)
 			assert.equals(0, ClassyMapCore:GetQueueLength())
 			assert.equals(2, count)
 		end)
@@ -46,6 +47,70 @@ describe("ClassyMap Core", function()
 
 			ClassyMapCore:ProcessQueue()
 			assert.equals(30, result)
+		end)
+
+		it("should preserve nil arguments", function()
+			local argumentCount
+			local secondArgument
+			ClassyMapCore:QueueAction(function(...)
+				argumentCount = select("#", ...)
+				secondArgument = select(2, ...)
+			end, { "first", nil, "third", n = 3 })
+
+			ClassyMapCore:ProcessQueue()
+			assert.equals(3, argumentCount)
+			assert.is_nil(secondArgument)
+		end)
+
+		it("should continue after an action fails", function()
+			local reportedError
+			local finalActionCalled = false
+			ClassyMapCore:QueueAction(function()
+				error("expected failure")
+			end)
+			ClassyMapCore:QueueAction(function()
+				finalActionCalled = true
+			end)
+
+			local processed, failed = ClassyMapCore:ProcessQueue(function(err)
+				reportedError = err
+			end)
+			assert.equals(2, processed)
+			assert.equals(1, failed)
+			assert.is_truthy(reportedError:match("expected failure"))
+			assert.is_true(finalActionCalled)
+			assert.equals(0, ClassyMapCore:GetQueueLength())
+		end)
+
+		it("should leave actions queued during processing for the next drain", function()
+			local callCount = 0
+			ClassyMapCore:QueueAction(function()
+				callCount = callCount + 1
+				ClassyMapCore:QueueAction(function()
+					callCount = callCount + 1
+				end)
+			end)
+
+			assert.equals(1, ClassyMapCore:ProcessQueue())
+			assert.equals(1, callCount)
+			assert.equals(1, ClassyMapCore:GetQueueLength())
+			assert.equals(1, ClassyMapCore:ProcessQueue())
+			assert.equals(2, callCount)
+		end)
+
+		it("should reject invalid queue entries immediately", function()
+			assert.has_error(function()
+				ClassyMapCore:QueueAction(nil)
+			end, "QueueAction requires a function")
+			assert.has_error(function()
+				ClassyMapCore:QueueAction(function() end, "invalid")
+			end, "QueueAction args must be a table or nil")
+			assert.has_error(function()
+				ClassyMapCore:QueueAction(function() end, { n = -1 })
+			end, "QueueAction args.n must be a non-negative integer")
+			assert.has_error(function()
+				ClassyMapCore:QueueAction(function() end, { n = math.huge })
+			end, "QueueAction args.n must be a non-negative integer")
 		end)
 
 		it("should clear queue without processing", function()
@@ -87,6 +152,11 @@ describe("ClassyMap Core", function()
 			it("should floor decimal values", function()
 				assert.equals(2, ClassyMapCore:ValidateBorderSize(2.7))
 			end)
+
+			it("should return default for non-finite numbers", function()
+				assert.equals(1, ClassyMapCore:ValidateBorderSize(0 / 0))
+				assert.equals(1, ClassyMapCore:ValidateBorderSize(math.huge))
+			end)
 		end)
 
 		describe("ValidateFontSize", function()
@@ -105,6 +175,11 @@ describe("ClassyMap Core", function()
 			it("should accept valid values", function()
 				assert.equals(10, ClassyMapCore:ValidateFontSize(10))
 				assert.equals(16, ClassyMapCore:ValidateFontSize(16))
+			end)
+
+			it("should return default for non-finite numbers", function()
+				assert.equals(11, ClassyMapCore:ValidateFontSize(0 / 0))
+				assert.equals(11, ClassyMapCore:ValidateFontSize(-math.huge))
 			end)
 		end)
 
@@ -131,6 +206,14 @@ describe("ClassyMap Core", function()
 				assert.equals(1, color.g) -- default
 				assert.equals(1, color.b) -- default
 				assert.equals(1, color.a) -- default
+			end)
+
+			it("should default non-finite channels", function()
+				local color = ClassyMapCore:ValidateColor({ r = 0 / 0, g = math.huge, b = -math.huge, a = 0.5 })
+				assert.equals(1, color.r)
+				assert.equals(1, color.g)
+				assert.equals(1, color.b)
+				assert.equals(0.5, color.a)
 			end)
 		end)
 	end)

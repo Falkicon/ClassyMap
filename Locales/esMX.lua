@@ -16,8 +16,7 @@ L["A minimalist square minimap with a simple border and button drawer.\n"] =
 	"Un minimapa cuadrado minimalista con un borde simple y cajón de botones.\n"
 L["Border"] = "Borde"
 L["Border Size"] = "Tamaño del borde"
-L["Thickness of the minimap border. Set to 0 to hide."] =
-	"Grosor del borde del minimapa. Establece en 0 para ocultar."
+L["Thickness of the minimap border. Set to 0 to hide."] = "Grosor del borde del minimapa. Establece en 0 para ocultar."
 L["Border Color"] = "Color del borde"
 L["Color of the minimap border."] = "Color del borde del minimapa."
 L["Fonts"] = "Fuentes"

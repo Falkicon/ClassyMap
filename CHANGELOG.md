@@ -4,6 +4,28 @@ All notable changes to ClassyMap will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+## [1.6.0] - 2026-09-06
+
+### Added
+
+- Scoped refresh scheduling that combines pending work and waits for login/combat readiness.
+- Observable frame ownership and conditional hooks, with safe partial restoration on disable. Full removal of square mask effects still requires reload.
+- Performance invocation counts, cumulative/average/maximum durations, rate reporting, and a Reset Metrics tool.
+- Strict offline UI mocks, integration tests using bundled Ace libraries, and automated quality checks.
+- AceDB profile controls for creating, copying, resetting, and switching settings profiles.
+
+### Changed
+
+- Updated user and contributor documentation for current settings, runtime behavior, and offline/live validation workflows.
+
+### Fixed
+
+- Combat queue event registration, nested actions, and nil arguments.
+- Recursive layout updates, clock text targeting, and zone-color restoration.
+- Settings validation and profile refreshes; misleading diagnostic controls and performance units.
+
 ## [1.5.0] - 2026-04-30
 
 ### Changed
