@@ -15,19 +15,22 @@ Fixes # (issue number, if applicable)
 
 ## Testing Done
 
-- [ ] Tested on WoW Retail
-- [ ] Tested on Midnight Beta (if available)
+List commands/results and the exact client version/build tested. Mark live checks N/A for documentation-only changes, or state what remains unverified.
+
+- [ ] Relevant offline checks from CONTRIBUTING.md pass
+- [ ] Tested runtime changes on the client targeted by ClassyMap.toc
 - [ ] Addon loads without errors
 - [ ] Minimap mask is square
+- [ ] `GetMinimapShape()` reports `SQUARE`
 - [ ] Border displays correctly and settings update live
-- [ ] No Lua errors in combat
+- [ ] Settings persist and profile switching/copying/resetting refreshes correctly
+- [ ] Combat changes apply after combat without Lua errors
 
 ## Checklist
 
 - [ ] My code follows the project's style guidelines
-- [ ] I have read [CONTRIBUTING.md](CONTRIBUTING.md)
+- [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md)
 - [ ] I have updated documentation if needed
-- [ ] I have tested my changes in-game
 
 ## Screenshots
 

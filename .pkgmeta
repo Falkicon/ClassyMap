@@ -6,13 +6,41 @@ ignore:
   - .git
   - .github
   - .gitignore
+  - .cursorignore
+  - .gitattributes
   - .luacheckrc
   - .markdownlint.json
   - .vscode
   - AGENTS.md
   - CHANGELOG.md
+  - CONTRIBUTING.md
   - LICENSE
   - README.md
+
+  # Development tests and review notes are not part of the addon package.
+  - tests
+  - docs
+  - Core/core_spec.lua
+
+  # FenCore's development-only material is not loaded by FenCore.xml.
+  - Libs/FenCore/AGENTS.md
+  - Libs/FenCore/Docs
+  - Libs/FenCore/PLAN
+  - Libs/FenCore/Tests
+  - Libs/FenCore/README.md
+  - Libs/FenCore/Core/!sandbox_bootstrap.lua
+  - Libs/FenCore/Core/zz_sandbox_domains.lua
+  - Libs/FenCore/FenCore.toc
+
+  # Libraries retained in the checkout from the original template but not
+  # referenced by embeds.xml or the addon source.
+  - Libs/AceHook-3.0
+  - Libs/LibDataBroker-1.1
+  - Libs/LibDBIcon-1.0
+  - Assets/classymap-logo-400.png
+
+  # Dependency tracking is for the repository and Mechanic tooling only.
+  - Libs/libs.json
 
 manual-changelog:
   filename: CHANGELOG.md

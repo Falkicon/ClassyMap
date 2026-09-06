@@ -5,7 +5,8 @@ end
 
 -- Core.lua
 L["ClassyMap"] = "ClassyMap"
-L["Loaded. Type /classymap or /cm for options."] = "Загружено. Введите /classymap или /cm для настроек."
+L["Loaded. Type /classymap or /cm for options."] =
+	"Загружено. Введите /classymap или /cm для настроек."
 L["Enabled"] = "Включено"
 L["Disabled"] = "Отключено"
 L["Expansion Summary"] = "Обзор дополнения"
@@ -35,7 +36,8 @@ L["Hide Zone Text"] = "Скрыть текст зоны"
 L["Hide Clock"] = "Скрыть часы"
 L["Hide the time display."] = "Скрыть отображение времени."
 L["Hide Zoom Buttons"] = "Скрыть кнопки масштаба"
-L["Hide the minimap zoom in/out buttons."] = "Скрыть кнопки масштабирования миникарты."
+L["Hide the minimap zoom in/out buttons."] =
+	"Скрыть кнопки масштабирования миникарты."
 L["Hide Expansion Button"] = "Скрыть кнопку дополнения"
 L["Hide the large expansion button and replace with a smaller icon."] =
 	"Скрыть большую кнопку дополнения и заменить маленьким значком."
