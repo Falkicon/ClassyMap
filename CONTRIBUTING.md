@@ -36,7 +36,7 @@ This addon prioritizes a minimal footprint:
 
 ### Current Client Compatibility
 
-The declared client target is Interface 120100 in [ClassyMap.toc](ClassyMap.toc). Record the actual client version/build used for live testing. When adding features:
+The declared client targets are Interface 120100 (Retail) and 16001 (WoW: Forever beta) in [ClassyMap.toc](ClassyMap.toc). Forever runs the Retail UI and API, but `GetBuildInfo()` reports 16001, so never gate Retail code paths on a minimum build number. Record the actual client version/build used for live testing. When adding features:
 
 - Ensure modifications are resilient to UI updates
 - Follow the `OwnSet` ownership and conditional-restoration contract; preserve combat deferral and stale-callback cancellation

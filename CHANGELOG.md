@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-18
+
+### Added
+
+- WoW: Forever beta support. The TOC now declares Interface 16001 alongside Retail 120100.
+
+### Fixed
+
+- The Edit Mode selection box now matches the square map exactly, so the map can be placed flush in a screen corner. Blizzard's minimap cluster is a resize-layout frame that re-sized itself to its hidden native children on every layout pass; ClassyMap now pins the cluster to the map's rendered footprint, follows the Edit Mode "Size" setting, and clamps the cluster to the screen without the old 60px overhang.
+
 ## [1.6.0] - 2026-09-06
 
 ### Added

@@ -573,8 +573,39 @@ function Mock:Install(options)
 		protected = true,
 		points = { pack("TOPRIGHT", nativeParent, "TOPRIGHT", -20, -20) },
 	})
-	_G.Minimap = self:NewFrame("Minimap", {
+	-- Blizzard's cluster is a ResizeLayoutFrame: Layout() sizes it to its native
+	-- children unless a fixed size is set. Edit Mode's size setting scales the
+	-- container between the cluster and the map.
+	MinimapCluster.nativeLayoutSize = pack(256, 256)
+	function MinimapCluster:SetFixedSize(width, height)
+		mutate(self, "SetFixedSize", width, height)
+		self.fixedSize = pack(width, height)
+	end
+	function MinimapCluster:GetFixedSize()
+		local fixed = self.fixedSize or pack(nil, nil)
+		return unpackValues(fixed, 1, fixed.n)
+	end
+	function MinimapCluster:Layout()
+		record(self, "Layout")
+		local fixedWidth, fixedHeight = self:GetFixedSize()
+		if fixedWidth and fixedHeight then
+			self:SetSize(fixedWidth, fixedHeight)
+		else
+			self:SetSize(unpackValues(self.nativeLayoutSize, 1, 2))
+		end
+	end
+	function MinimapCluster:SetEditModeScale(scale)
+		record(self, "SetEditModeScale", scale)
+		self.MinimapContainer:SetScale(scale)
+		self:Layout()
+	end
+	MinimapCluster.MinimapContainer = self:NewFrame("MinimapContainer", {
 		parent = MinimapCluster,
+		protected = true,
+		points = { pack("TOP", MinimapCluster, "TOP", 10, -30) },
+	})
+	_G.Minimap = self:NewFrame("Minimap", {
+		parent = MinimapCluster.MinimapContainer,
 		protected = true,
 		points = { pack("CENTER", MinimapCluster, "CENTER", 3, 4) },
 	})

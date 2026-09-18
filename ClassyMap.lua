@@ -36,6 +36,7 @@ local getters = {
 	SetParent = "GetParent",
 	SetWidth = "GetWidth",
 	SetHeight = "GetHeight",
+	SetFixedSize = "GetFixedSize",
 	SetFrameStrata = "GetFrameStrata",
 	SetScale = "GetScale",
 	SetAlpha = "GetAlpha",
@@ -124,6 +125,7 @@ end
 local restoreOrder = {
 	"SetParent",
 	"SetScale",
+	"SetFixedSize",
 	"SetWidth",
 	"SetHeight",
 	"points",
@@ -487,16 +489,48 @@ function ClassyMap:SatStyles(f)
 	self:OwnSet(f, "Show")
 end
 
+-- The map's rendered size expressed in MinimapCluster coordinates. Edit Mode's
+-- "Size" setting scales MinimapContainer, which sits between the two, so the
+-- map's own GetWidth() no longer describes the space it occupies in the cluster.
+function ClassyMap:GetMinimapFootprint()
+	local scale = 1
+	local frame = Minimap
+	while frame and frame ~= MinimapCluster do
+		scale = scale * (frame.GetScale and frame:GetScale() or 1)
+		frame = frame.GetParent and frame:GetParent()
+	end
+	if not frame then
+		-- Another addon moved the map out of the cluster; compare effective scales.
+		scale = 1
+		if Minimap.GetEffectiveScale and MinimapCluster.GetEffectiveScale then
+			local clusterScale = MinimapCluster:GetEffectiveScale()
+			if clusterScale and clusterScale > 0 then
+				scale = Minimap:GetEffectiveScale() / clusterScale
+			end
+		end
+	end
+	return Minimap:GetWidth() * scale, Minimap:GetHeight() * scale
+end
+
 local function ApplyLayout(self)
 	local db = self.db.profile
 	local MARGIN = 4
 	local STACK_GAP = 2
 	local ICON_SIZE = 24 -- Size for standardized placement if needed
 
-	-- Cluster & Map
-	if MinimapCluster then
-		self:OwnSet(MinimapCluster, "SetWidth", Minimap:GetWidth())
-		self:OwnSet(MinimapCluster, "SetHeight", Minimap:GetHeight())
+	-- Cluster & Map. MinimapCluster is a Blizzard ResizeLayoutFrame: its Layout()
+	-- pass (Edit Mode, OnShow) resizes it to the bounding box of the native
+	-- children, which is larger than the square map and leaves the Edit Mode
+	-- selection box loose around it. A fixed size makes Layout() reproduce the
+	-- map's footprint instead, so the selection box and screen clamping match
+	-- the map exactly.
+	if MinimapCluster and Minimap then
+		local width, height = self:GetMinimapFootprint()
+		if MinimapCluster.SetFixedSize then
+			self:OwnSet(MinimapCluster, "SetFixedSize", width, height)
+		end
+		self:OwnSet(MinimapCluster, "SetWidth", width)
+		self:OwnSet(MinimapCluster, "SetHeight", height)
 	end
 	if Minimap then
 		self:OwnSet(Minimap, "ClearAllPoints")
@@ -680,7 +714,8 @@ function ClassyMap:ApplyMinimapChanges()
 		end
 		if MinimapCluster then
 			self:OwnSet(MinimapCluster, "SetClampedToScreen", true)
-			self:OwnSet(MinimapCluster, "SetClampRectInsets", 0, -60, 0, -60)
+			-- The cluster now matches the map, so it can sit flush against the screen edge.
+			self:OwnSet(MinimapCluster, "SetClampRectInsets", 0, 0, 0, 0)
 		end
 		self:OwnSet(Minimap, "SetClampedToScreen", false)
 	end)
@@ -696,6 +731,25 @@ function ClassyMap:ApplyMinimapChanges()
 		hooksecurefunc(MinimapCluster, "SetHeight", function()
 			self:RequestLayout()
 		end)
+		if MinimapCluster.SetEditModeScale then
+			-- Edit Mode "Size" scales MinimapContainer; the fixed cluster size must follow.
+			hooksecurefunc(MinimapCluster, "SetEditModeScale", function()
+				self:RequestLayout()
+			end)
+		end
+		if MinimapCluster.Layout then
+			-- Safety net: a native layout pass that lands on a different size (stale
+			-- fixed size, or another addon cleared it) gets one corrective pass.
+			hooksecurefunc(MinimapCluster, "Layout", function(cluster)
+				if not self.runtimeEnabled or self.resizing then
+					return
+				end
+				local width, height = self:GetMinimapFootprint()
+				if cluster:GetWidth() ~= width or cluster:GetHeight() ~= height then
+					self:RequestLayout()
+				end
+			end)
+		end
 		self.hookedLayout = true
 	end
 end

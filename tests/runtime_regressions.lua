@@ -124,6 +124,31 @@ Assert.equal(calls.ApplyFontStyles, 1, "startup did not apply fonts once")
 Assert.equal(calls.FixLayout, 1, "startup did not apply layout once")
 Assert.equal(#env.errors, 0, "startup reported an error")
 
+-- The cluster is a Blizzard ResizeLayoutFrame. Its native Layout() pass (Edit
+-- Mode, OnShow) must keep reproducing the map's rendered footprint, including
+-- the Edit Mode size scale applied to MinimapContainer, without extra work.
+resetCalls()
+Assert.equal(MinimapCluster:GetWidth(), Minimap:GetWidth(), "cluster width does not match the map")
+Assert.equal(MinimapCluster:GetHeight(), Minimap:GetHeight(), "cluster height does not match the map")
+MinimapCluster:Layout()
+Assert.equal(MinimapCluster:GetWidth(), Minimap:GetWidth(), "native layout pass resized the cluster away from the map")
+Assert.equal(MinimapCluster:GetHeight(), Minimap:GetHeight(), "native layout pass changed the cluster height")
+Assert.equal(#env.timers, 0, "a matching native layout pass scheduled work")
+MinimapCluster:SetEditModeScale(0.5)
+Assert.equal(#env.timers, 1, "Edit Mode scale change did not schedule one layout pass")
+env:FlushTimers()
+Assert.equal(calls.FixLayout, 1, "Edit Mode scale change did not run one layout pass")
+Assert.equal(MinimapCluster:GetWidth(), Minimap:GetWidth() * 0.5, "cluster did not follow the scaled map footprint")
+Assert.equal(MinimapCluster:GetHeight(), Minimap:GetHeight() * 0.5, "cluster height ignored the map scale")
+Assert.point(Minimap, 1, { "CENTER", MinimapCluster, "CENTER", 0, 0 }, "scaled map is not centered in the cluster")
+MinimapCluster:Layout()
+Assert.equal(MinimapCluster:GetWidth(), Minimap:GetWidth() * 0.5, "layout pass after a scale change lost the footprint")
+Assert.equal(#env.timers, 0, "a matching scaled layout pass scheduled work")
+MinimapCluster:SetEditModeScale(1)
+env:FlushTimers()
+Assert.equal(MinimapCluster:GetWidth(), Minimap:GetWidth(), "cluster did not return to the unscaled footprint")
+Assert.equal(#env.errors, 0, "cluster layout tracking reported an error")
+
 -- Both Blizzard dimension hooks coalesce, and a layout error cannot strand the guard.
 resetCalls()
 MinimapCluster:SetWidth(200)
@@ -374,6 +399,9 @@ Assert.equal(GameTimeFrame:GetParent(), externalParent, "disable overwrote an ex
 Assert.point(GameTimeFrame, 1, { "BOTTOM", externalParent, "BOTTOM", 9, 10 }, "disable overwrote external anchors")
 Assert.equal(GameTimeFrame:IsShown(), false, "disable overwrote external visibility")
 Assert.point(Minimap, 1, { "CENTER", MinimapCluster, "CENTER", 3, 4 }, "owned minimap anchor was not restored")
+Assert.equal((MinimapCluster:GetFixedSize()), nil, "disable did not clear the cluster's fixed layout size")
+MinimapCluster:Layout()
+Assert.equal(MinimapCluster:GetWidth(), 256, "disabled addon still pinned the native cluster layout")
 Assert.equal(MinimapCompassTexture:IsShown(), true, "owned compass visibility was not restored")
 Assert.equal(MinimapCompassTexture:GetAlpha(), 1, "owned compass alpha was not restored")
 
