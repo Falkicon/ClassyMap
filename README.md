@@ -2,7 +2,7 @@
 
 A minimalist square minimap addon for World of Warcraft. Transforms the default circular minimap into a clean, modern square shape.
 
-![Interface](https://img.shields.io/badge/Interface-120100%20%7C%2016001-green)
+![Interface](https://img.shields.io/badge/Interface-120100%20%7C%20120105%20%7C%2016001-green)
 [![GitHub](https://img.shields.io/badge/GitHub-Falkicon%2FClassyMap-181717?logo=github)](https://github.com/Falkicon/ClassyMap)
 [![Sponsor](https://img.shields.io/badge/Sponsor-pink?logo=githubsponsors)](https://github.com/sponsors/Falkicon)
 
@@ -65,7 +65,7 @@ Open settings via `/cm`, the ClassyMap entry in the addon compartment, or the in
 
 ## Requirements
 
-- World of Warcraft Retail or the WoW: Forever beta. The declared client targets are Interface 120100 (Retail) and 16001 (Forever) in [ClassyMap.toc](ClassyMap.toc).
+- World of Warcraft Retail or the WoW: Forever beta. The declared client targets are Interface 120100 (Retail 12.1.0), 120105 (Retail 12.1.5) and 16001 (Forever) in [ClassyMap.toc](ClassyMap.toc).
 - On Forever, the client currently does not read saved variables back at launch, so ClassyMap settings reset to defaults each session.
 - Required libraries are bundled; Mechanic is optional developer tooling.
 

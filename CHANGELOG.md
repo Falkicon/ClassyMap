@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- TOC now also declares Interface 120105 so the addon loads as current on Retail 12.1.5.
+
 ## [1.6.1] - 2026-09-18
 
 ### Added
